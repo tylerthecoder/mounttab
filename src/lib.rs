@@ -1,40 +1,11 @@
 use std::fs;
-use std::path::Path;
+use model::Action;
 use notify::{Watcher, RecommendedWatcher, RecursiveMode, Config};
 
-struct Tab {
-    title: String,
-    id: String,
-}
-
-struct TabList {
-    tabs: Vec<Tab>,
-}
-
-#[derive(Debug)]
-enum Action {
-    OpenTab(String),
-    CloseTab(String),
-}
-
-impl TabList {
-    pub fn handle_action(&mut self, action: Action) {
-       match action {
-           Action::OpenTab(title) => {
-               let id = format!("tab-{}", self.tabs.len());
-               self.tabs.push(Tab { title, id });
-           }
-           Action::CloseTab(id) => {
-               self.tabs.retain(|tab| tab.id != id);
-           }
-       } 
-    }
-}
+pub mod browser_interface;
+pub mod model;
 
 
-
-
-type ActionList = Vec<Action>;
 
 fn main() {
     let path = std::env::args()
@@ -75,9 +46,7 @@ fn watch(path: String) -> notify::Result<()> {
 
 
 
-fn watch_event_to_action(event: notify::Event, base_path: &String) -> ActionList {
-    let mut actions = vec![];
-
+fn watch_event_to_action(event: notify::Event, base_path: &String) -> Option<Action> {
     match event.kind {
         notify::event::EventKind::Create(_) => {
 
@@ -90,21 +59,34 @@ fn watch_event_to_action(event: notify::Event, base_path: &String) -> ActionList
                 println!("path: {:?} {:?}", path, base_path);
 
                 if let Ok(path) = path {
-                    actions.push(Action::OpenTab(path.to_string_lossy().to_string()));
+                    return Some(Action::OpenTab(path.to_string_lossy().to_string()))
                 }
             }
 
 
         }
         notify::event::EventKind::Remove(_) => {
-            actions.push(Action::CloseTab(event.paths[0].to_string_lossy().to_string()));
+            let canonical_path = fs::canonicalize(base_path);
+
+            println!("canonical_path: {:?} {:?}", base_path, canonical_path);
+
+            if let Ok(canonical_path) = canonical_path {
+                let path = event.paths[0].strip_prefix(canonical_path);
+                println!("path: {:?} {:?}", path, base_path);
+
+                if let Ok(path) = path {
+                    return Some(Action::CloseTab(path.to_string_lossy().to_string()))
+                }
+            }
+
         }
         _ => {
             println!("unhandled event: {:?}", event);
         }
     }
 
-    actions
+
+    None
 }
 
 

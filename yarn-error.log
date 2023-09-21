@@ -1,0 +1,44 @@
+Arguments: 
+  /home/tylord/.local/share/nvm/versions/node/v20.5.1/bin/node /home/tylord/.local/share/nvm/versions/node/v20.5.1/bin/yarn build
+
+PATH: 
+  /home/tylord/.bun/bin:/home/tylord/.cargo/bin:/home/tylord/.elan/bin:/home/tylord/.local/bin:/home/tylord/.bun/bin:/home/tylord/.cargo/bin:/home/tylord/.local/share/nvm/versions/node/v20.5.1/bin:/home/tylord/.elan/bin:/home/tylord/.local/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/var/lib/flatpak/exports/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/lib/rustup/bin:/usr/lib/rustup/bin
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  20.5.1
+
+Platform: 
+  linux x64
+
+Trace: 
+  SyntaxError: /home/tylord/dev/tabfs-rs/package.json: Expected double-quoted property name in JSON at position 138
+      at JSON.parse (<anonymous>)
+      at /home/tylord/.local/share/nvm/versions/node/v20.5.1/lib/node_modules/yarn/lib/cli.js:1629:59
+      at Generator.next (<anonymous>)
+      at step (/home/tylord/.local/share/nvm/versions/node/v20.5.1/lib/node_modules/yarn/lib/cli.js:310:30)
+      at /home/tylord/.local/share/nvm/versions/node/v20.5.1/lib/node_modules/yarn/lib/cli.js:321:13
+
+npm manifest: 
+  {
+    "name": "tabfs-rs",
+    "module": "src/extension.ts",
+    "type": "module",
+    "scripts": {
+      "build": "wasm-pack build --target web",
+    },
+    "devDependencies": {
+      "bun-types": "latest"
+    },
+    "peerDependencies": {
+      "typescript": "^5.0.0"
+    }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

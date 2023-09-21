@@ -1,0 +1,15 @@
+{
+  "name": "@mounttabs/extension",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "wasm-pack build --target web"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "tabfs-rs": "*"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
