@@ -1,0 +1,27 @@
+[package]
+name = "tabfs-rs"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+js-sys = "0.3.64"
+wasm-bindgen = "0.2.87"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
+web-sys = "0.3.64"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+
+# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
+# compared to the default allocator's ~10K. It is slower than the default
+# allocator, however.
+#
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+wee_alloc = { version = "0.4.2", optional = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+

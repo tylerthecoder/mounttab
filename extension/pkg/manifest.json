@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+
+  "name": "MountTab",
+  "description": "Mount browser tabs to a working directory",
+  "version": "1.0",
+
+  "permissions": [
+    "tabs", "tabCapture", "debugger", "nativeMessaging", "management", "unlimitedStorage", "<all_urls>"
+  ],
+  "host_permissions": [
+    "ws://localhost/*"
+  ],
+
+  "minimum_chrome_version": "116",
+
+  "background": {
+    "service_worker": "background.js"
+  }
+}
