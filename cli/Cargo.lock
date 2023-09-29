@@ -894,6 +894,7 @@ dependencies = [
  "notify",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "tokio",
  "tokio-stream",
  "warp",

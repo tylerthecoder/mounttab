@@ -1,8 +1,25 @@
-use crate::{model::Tab, file_watcher};
+use std::sync::Arc;
+use futures_util::Stream;
+use crate::{model::{Tab, Action}, file_watcher};
 
 struct Workspace {
-    tabList: Vec<Tab>,
-    watcher: file_watcher::FileWatcher,
+    tab_list: Vec<Tab>,
+    path: String,
+    action_stream: Arc<dyn Stream<Item = Action>>,
+}
+
+
+impl Workspace {
+    pub fn new(path: String) -> Result<Self, notify::Error> {
+        let action_stream = file_watcher::watch(path.clone())?;
+        Ok(
+            Self {
+                tab_list: Vec::new(),
+                path,
+                action_stream: Arc::new(action_stream),
+            }
+        )
+    }
 }
 
 

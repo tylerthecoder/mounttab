@@ -1,31 +1,34 @@
-use std::fs;
+use std::{fs, path::Path};
+use crate::model::Action;
+use futures_util::Stream;
 use notify::{Watcher, RecommendedWatcher, RecursiveMode, Config};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
-pub fn watch(path: String, browser_interface: BroswerInterface) -> notify::Result<()> {
-    let (tx, rx) = std::sync::mpsc::channel();
+
+pub fn watch(path: String) -> Result<impl Stream<Item = Action>, notify::Error> {
+    let (tx, rx) = mpsc::channel::<Action>(100);
+    let path_clone = path.clone();
 
     // Automatically select the best implementation for your platform.
     // You can also access each implementation directly e.g. INotifyWatcher.
-    let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
+    let mut watcher = RecommendedWatcher::new(move |res| {
+        if let Ok(event) = res {
+            let action = watch_event_to_action(event, &path_clone);
+            if let Some(action) = action {
+                let res = tx.blocking_send(action);
+                if let Err(e) = res {
+                    println!("error sending action: {:?}", e);
+                }
+            }
+        }
+    }, Config::default())?;
 
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
+    watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
 
-    for res in rx {
-        match res {
-            Ok(event) => {
-                let actions = watch_event_to_action(event, &path);
-                for action in actions {
-                    println!("action: {:?}", action);
-                    browser_interface.handle_action(action);
-                }
-            }
-            Err(error) => println!("watch error: {:?}", error),
-        }
-    }
-
-    Ok(())
+    Ok(ReceiverStream::new(rx))
 }
 
 

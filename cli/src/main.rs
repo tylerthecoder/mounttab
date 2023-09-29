@@ -1,11 +1,11 @@
-// #![deny(warnings)]
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-
 use futures_util::{SinkExt, StreamExt, TryFutureExt};
+use serde::{Serialize, Deserialize};
+use serde_json;
 use tokio::sync::{mpsc, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::{Message, WebSocket};
@@ -15,7 +15,12 @@ pub mod model;
 pub mod file_watcher;
 pub mod tab_workspace;
 
-
+#[derive(Serialize, Deserialize, Debug)]
+enum AppWebSocketMessage {
+    OpenWorkspace(String),
+    WorkspaceAction(String, model::Action),
+    CloseWorkspace(String),
+}
 
 /// Our global unique user id counter.
 static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
@@ -28,6 +33,13 @@ type Users = Arc<RwLock<HashMap<usize, mpsc::UnboundedSender<Message>>>>;
 
 #[tokio::main]
 async fn main() {
+    println!("Hello, world!");
+
+    // print a json serialized AppWebSocketMessage
+
+    let res = serde_json::to_string_pretty(&AppWebSocketMessage::OpenWorkspace("test".to_string()));
+
+    println!("json: {}", res.unwrap());
 
     // Keep track of all connected users, key is usize, value
     // is a websocket sender.
@@ -45,12 +57,7 @@ async fn main() {
             ws.on_upgrade(move |socket| user_connected(socket, users))
         });
 
-    // GET / -> index html
-    let index = warp::path::end().map(|| warp::reply::html(INDEX_HTML));
-
-    let routes = index.or(chat);
-
-    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+    warp::serve(chat).run(([127, 0, 0, 1], 3030)).await;
 }
 
 async fn user_connected(ws: WebSocket, users: Users) {
@@ -110,18 +117,40 @@ async fn user_message(my_id: usize, msg: Message, users: &Users) {
         return;
     };
 
-    let new_msg = format!("<User#{}>: {}", my_id, msg);
+    println!("received message: {}", msg);
+
+    // try converting the message to a AppWebSocketMessage
+    let msg: Result<AppWebSocketMessage, serde_json::Error> = serde_json::from_str(msg);
+
+    if let Err(e) = msg {
+        eprintln!("error parsing message: {}", e);
+        return;
+    }
+
+    let msg = msg.unwrap();
+
+    match msg {
+        AppWebSocketMessage::OpenWorkspace(path) => {
+            println!("opening workspace: {}", path);
+        },
+        AppWebSocketMessage::WorkspaceAction(path, _action) => {
+            println!("workspace action: {}", path);
+        },
+        AppWebSocketMessage::CloseWorkspace(path) => {
+            println!("closing workspace: {}", path);
+        },
+    }
 
     // New message from this user, send it to everyone else (except same uid)...
-    for (&uid, tx) in users.read().await.iter() {
-        if my_id != uid {
-            if let Err(_disconnected) = tx.send(Message::text(new_msg.clone())) {
-                // The tx is disconnected, our `user_disconnected` code
-                // should be happening in another task, nothing more to
-                // do here.
-            }
-        }
-    }
+    // for (&uid, tx) in users.read().await.iter() {
+    //     if my_id != uid {
+    //         if let Err(_disconnected) = tx.send(Message::text(new_msg.clone())) {
+    //             // The tx is disconnected, our `user_disconnected` code
+    //             // should be happening in another task, nothing more to
+    //             // do here.
+    //         }
+    //     }
+    // }
 }
 
 async fn user_disconnected(my_id: usize, users: &Users) {
@@ -130,51 +159,3 @@ async fn user_disconnected(my_id: usize, users: &Users) {
     // Stream closed up, so remove from the user list
     users.write().await.remove(&my_id);
 }
-
-static INDEX_HTML: &str = r#"<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <title>Warp Chat</title>
-    </head>
-    <body>
-        <h1>Warp chat</h1>
-        <div id="chat">
-            <p><em>Connecting...</em></p>
-        </div>
-        <input type="text" id="text" />
-        <button type="button" id="send">Send</button>
-        <script type="text/javascript">
-        const chat = document.getElementById('chat');
-        const text = document.getElementById('text');
-        const uri = 'ws://' + location.host + '/chat';
-        const ws = new WebSocket(uri);
-
-        function message(data) {
-            const line = document.createElement('p');
-            line.innerText = data;
-            chat.appendChild(line);
-        }
-
-        ws.onopen = function() {
-            chat.innerHTML = '<p><em>Connected!</em></p>';
-        };
-
-        ws.onmessage = function(msg) {
-            message(msg.data);
-        };
-
-        ws.onclose = function() {
-            chat.getElementsByTagName('em')[0].innerText = 'Disconnected!';
-        };
-
-        send.onclick = function() {
-            const msg = text.value;
-            ws.send(msg);
-            text.value = '';
-
-            message('<You>: ' + msg);
-        };
-        </script>
-    </body>
-</html>
-"#;
