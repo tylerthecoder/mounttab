@@ -1,18 +1,18 @@
+use futures_util::{SinkExt, StreamExt, TryFutureExt};
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use futures_util::{SinkExt, StreamExt, TryFutureExt};
-use serde::{Serialize, Deserialize};
-use serde_json;
 use tokio::sync::{mpsc, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
 
-pub mod model;
 pub mod file_watcher;
+pub mod model;
 pub mod tab_workspace;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -74,6 +74,7 @@ async fn user_connected(ws: WebSocket, users: Users) {
     let (tx, rx) = mpsc::unbounded_channel();
     let mut rx = UnboundedReceiverStream::new(rx);
 
+    // This redirects the value of rx to the user_ws_tx
     tokio::task::spawn(async move {
         while let Some(message) = rx.next().await {
             user_ws_tx
@@ -101,7 +102,16 @@ async fn user_connected(ws: WebSocket, users: Users) {
                 break;
             }
         };
-        user_message(my_id, msg, &users).await;
+
+        let mes_res = user_message(my_id, msg, &users).await;
+
+        if let Ok(()) = mes_res {
+            println!("message handled successfully")
+        }
+
+        if let Err(e) = mes_res {
+            eprintln!("error handling message: {}", e);
+        }
     }
 
     // user_ws_rx stream will keep processing as long as the user stays
@@ -109,36 +119,82 @@ async fn user_connected(ws: WebSocket, users: Users) {
     user_disconnected(my_id, &users).await;
 }
 
-async fn user_message(my_id: usize, msg: Message, users: &Users) {
+async fn user_message(my_id: usize, msg: Message, users: &Users) -> Result<(), notify::Error> {
     // Skip any non-Text messages...
     let msg = if let Ok(s) = msg.to_str() {
         s
     } else {
-        return;
+        return Ok(());
     };
 
     println!("received message: {}", msg);
 
     // try converting the message to a AppWebSocketMessage
     let msg: Result<AppWebSocketMessage, serde_json::Error> = serde_json::from_str(msg);
-
-    if let Err(e) = msg {
-        eprintln!("error parsing message: {}", e);
-        return;
-    }
-
-    let msg = msg.unwrap();
+    let msg = match msg {
+        Ok(msg) => msg,
+        Err(e) => {
+            eprintln!("error parsing message: {}", e);
+            return Ok(());
+        }
+    };
 
     match msg {
         AppWebSocketMessage::OpenWorkspace(path) => {
             println!("opening workspace: {}", path);
-        },
+
+            // Creating a file watcher
+
+            let mut action_stream = file_watcher::watch(path)?;
+
+            println!("file watcher created");
+
+            // let action_rx = workspaces.start(path)?;
+
+            while let Some(action) = action_stream.next().await {
+                println!("received action from file watcher: {:?}", action);
+
+                // send message to websocket
+                let read_guard = users.read().await;
+
+                let result = read_guard.iter().find(|(&uid, _tx)| uid == my_id);
+
+                let (_uid, tx) = match result {
+                    Some(x) => x,
+                    None => {
+                        eprintln!("user not found: {}", my_id);
+                        continue;
+                    }
+                };
+
+                let action_str = match serde_json::to_string(&action) {
+                    Ok(str) => str,
+                    Err(e) => {
+                        eprintln!("error serializing action: {}", e);
+                        continue;
+                    }
+                };
+
+                let msg = Message::text(action_str);
+
+                // send message to the user
+                tx.send(msg).unwrap_or_else(|e| {
+                    eprintln!("websocket send error: {}", e);
+                });
+            }
+
+            // convert error to warp::Error and return
+
+            Ok(())
+        }
         AppWebSocketMessage::WorkspaceAction(path, _action) => {
             println!("workspace action: {}", path);
-        },
+            Ok(())
+        }
         AppWebSocketMessage::CloseWorkspace(path) => {
             println!("closing workspace: {}", path);
-        },
+            Ok(())
+        }
     }
 
     // New message from this user, send it to everyone else (except same uid)...

@@ -1,10 +1,8 @@
-
-const connectToSocket = () => {
-    const socket = new WebSocket("ws://localhost:3030/chat");
+    const socket = new WebSocket("ws://127.0.0.1:3030/chat");
     socket.onopen = () => {
         console.log("Connected to socket");
         socket.send(JSON.stringify({
-            "OpenWorkspace": "test"
+            "OpenWorkspace": "/home/tylord/dev/tabfs-rs/test"
         }));
     }
     socket.onclose = () => {
@@ -13,11 +11,3 @@ const connectToSocket = () => {
     socket.onmessage = (event) => {
         console.log("Message received", event.data);
     }
-
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        console.log("Message received", message);
-    });
-}
-
-connectToSocket();
-
