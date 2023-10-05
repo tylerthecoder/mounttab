@@ -5,41 +5,54 @@ use std::{fs, path::Path};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
-pub fn watch(path: String) -> Result<impl Stream<Item = Action>, notify::Error> {
-    let (tx, rx) = mpsc::channel::<Action>(100);
+// async fn async_watch_2(path: String, action_tx: Sender<Action>) -> notify::Result<()> {
+//     let (tx, mut rx) = mpsc::channel::<Action>(100);
+//     let watcher = notify::recommended_watcher(tx);
+// }
+
+pub async fn async_watch(path: String, action_tx: mpsc::Sender<Action>) -> notify::Result<()> {
+    let (tx, mut rx) = mpsc::channel::<Action>(100);
+
     let path_clone = path.clone();
 
     // Automatically select the best implementation for your platform.
     // You can also access each implementation directly e.g. INotifyWatcher.
-    let mut watcher = RecommendedWatcher::new(
-        move |res| {
-            let event = match res {
-                Ok(event) => event,
-                Err(e) => {
-                    println!("watch error: {:?}", e);
-                    return;
-                }
-            };
+    let mut watcher = notify::recommended_watcher(move |res| match res {
+        Ok(event) => {
+            println!("got event: {:?}", event);
+            tokio::runtime::Runtime::new().unwrap().block_on(async {
+                let action = match watch_event_to_action(event, &path_clone) {
+                    Some(action) => {
+                        println!("Action received: {:?}", action);
+                        action
+                    }
+                    None => {
+                        println!("No action for event");
+                        return ();
+                    }
+                };
 
-            let action = watch_event_to_action(event, &path_clone);
-
-            if let Some(action) = action {
-                let res = tx.blocking_send(action);
-                if let Err(e) = res {
-                    println!("error sending action: {:?}", e);
-                }
-            }
-        },
-        Config::default(),
-    )?;
-
-    println!("Watching path: {}", path);
+                let _send_res = tx.send(action).await;
+            });
+        }
+        Err(e) => {
+            println!("watch error: {:?}", e);
+        }
+    })?;
 
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
+    watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
 
-    Ok(ReceiverStream::new(rx))
+    while let Some(action) = rx.recv().await {
+        println!(
+            "Received action from file watcher in file watcher: {:?}",
+            action
+        );
+        let _ = action_tx.send(action).await;
+    }
+
+    Ok(())
 }
 
 fn watch_event_to_action(event: notify::Event, base_path: &String) -> Option<Action> {
@@ -47,11 +60,11 @@ fn watch_event_to_action(event: notify::Event, base_path: &String) -> Option<Act
         notify::event::EventKind::Create(_) => {
             let canonical_path = fs::canonicalize(base_path);
 
-            println!("canonical_path: {:?} {:?}", base_path, canonical_path);
+            // println!("canonical_path: {:?} {:?}", base_path, canonical_path);
 
             if let Ok(canonical_path) = canonical_path {
                 let path = event.paths[0].strip_prefix(canonical_path);
-                println!("path: {:?} {:?}", path, base_path);
+                // println!("path: {:?} {:?}", path, base_path);
 
                 if let Ok(path) = path {
                     return Some(Action::OpenTab(path.to_string_lossy().to_string()));
@@ -61,11 +74,11 @@ fn watch_event_to_action(event: notify::Event, base_path: &String) -> Option<Act
         notify::event::EventKind::Remove(_) => {
             let canonical_path = fs::canonicalize(base_path);
 
-            println!("canonical_path: {:?} {:?}", base_path, canonical_path);
+            // println!("canonical_path: {:?} {:?}", base_path, canonical_path);
 
             if let Ok(canonical_path) = canonical_path {
                 let path = event.paths[0].strip_prefix(canonical_path);
-                println!("path: {:?} {:?}", path, base_path);
+                // println!("path: {:?} {:?}", path, base_path);
 
                 if let Ok(path) = path {
                     return Some(Action::CloseTab(path.to_string_lossy().to_string()));

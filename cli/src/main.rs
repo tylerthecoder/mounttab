@@ -6,10 +6,13 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use tokio::sync::mpsc::channel;
 use tokio::sync::{mpsc, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
+
+use crate::model::Action;
 
 pub mod file_watcher;
 pub mod model;
@@ -20,6 +23,12 @@ enum AppWebSocketMessage {
     OpenWorkspace(String),
     WorkspaceAction(String, model::Action),
     CloseWorkspace(String),
+}
+
+/** Some messages the client will never send us */
+#[derive(Serialize, Deserialize, Debug)]
+enum SendableMessage {
+    AllWorkspaces(Vec<String>),
 }
 
 /// Our global unique user id counter.
@@ -145,14 +154,18 @@ async fn user_message(my_id: usize, msg: Message, users: &Users) -> Result<(), n
 
             // Creating a file watcher
 
-            let mut action_stream = file_watcher::watch(path)?;
+            let (tx, mut rx) = channel::<Action>(101);
+
+            tokio::spawn(async move {
+                let _ = file_watcher::async_watch(path, tx).await;
+            });
 
             println!("file watcher created");
 
             // let action_rx = workspaces.start(path)?;
 
-            while let Some(action) = action_stream.next().await {
-                println!("received action from file watcher: {:?}", action);
+            while let Some(action) = rx.recv().await {
+                println!("Received action from file watcher: {:?}", action);
 
                 // send message to websocket
                 let read_guard = users.read().await;
@@ -196,17 +209,6 @@ async fn user_message(my_id: usize, msg: Message, users: &Users) -> Result<(), n
             Ok(())
         }
     }
-
-    // New message from this user, send it to everyone else (except same uid)...
-    // for (&uid, tx) in users.read().await.iter() {
-    //     if my_id != uid {
-    //         if let Err(_disconnected) = tx.send(Message::text(new_msg.clone())) {
-    //             // The tx is disconnected, our `user_disconnected` code
-    //             // should be happening in another task, nothing more to
-    //             // do here.
-    //         }
-    //     }
-    // }
 }
 
 async fn user_disconnected(my_id: usize, users: &Users) {

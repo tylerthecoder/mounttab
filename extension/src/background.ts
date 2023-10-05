@@ -12,11 +12,34 @@ const connectToSocket = () => {
     }
     socket.onmessage = (event) => {
         console.log("Message received", event.data);
+        const strData = event.data.toString();
+        const message = JSON.parse(strData);
+        handleSocketMessage(message);
     }
 
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        console.log("Message received", message);
+    chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
+        console.log("Chrome message received", message);
     });
+}
+
+type SocketMessage = {
+    CloseTab: string;
+}
+
+const getAllTabs = async () => {
+    const tabs = await chrome.tabs.query({});
+};
+
+
+
+const handleSocketMessage = (message: SocketMessage) => {
+    if (message.CloseTab) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs.length > 0) {
+                chrome.tabs.remove(tabs[0].id!);
+            }
+        });
+    }
 }
 
 connectToSocket();
