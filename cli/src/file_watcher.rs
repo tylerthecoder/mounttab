@@ -1,14 +1,7 @@
 use crate::model::Action;
-use futures_util::Stream;
-use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use std::{fs, path::Path};
+use notify::{RecursiveMode, Watcher};
+use std::fs;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
-
-// async fn async_watch_2(path: String, action_tx: Sender<Action>) -> notify::Result<()> {
-//     let (tx, mut rx) = mpsc::channel::<Action>(100);
-//     let watcher = notify::recommended_watcher(tx);
-// }
 
 pub async fn async_watch(path: String, action_tx: mpsc::Sender<Action>) -> notify::Result<()> {
     let (tx, mut rx) = mpsc::channel::<Action>(100);
