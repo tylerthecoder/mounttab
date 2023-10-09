@@ -26,11 +26,22 @@ type SocketMessage = {
     CloseTab: string;
 }
 
+let tabs: any[] = []
 const getAllTabs = async () => {
-    const tabs = await chrome.tabs.query({});
+    tabs = await chrome.tabs.query({ });
+    console.log("Tabs", tabs);
 };
+getAllTabs();
 
-
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === "GetAllWorkspaces") {
+        chrome.tabs.query({ }).then((tabs) => {
+            console.log("Sending response", tabs);
+            sendResponse(tabs);
+        });
+    }
+    return true
+});
 
 const handleSocketMessage = (message: SocketMessage) => {
     if (message.CloseTab) {
