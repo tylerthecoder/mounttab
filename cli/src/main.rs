@@ -227,7 +227,12 @@ async fn user_message(my_id: usize, msg: Message, users: &UserHolder) -> Result<
             let (tx, mut rx) = channel::<Action>(101);
 
             tokio::spawn(async move {
-                let _ = file_watcher::async_watch(path, tx).await;
+                println!("spawning file watcher");
+                let res = file_watcher::async_watch(path, tx).await;
+                if let Err(e) = res {
+                    eprintln!("error watching file: {}", e);
+                }
+                println!("Watch ended");
             });
 
             println!("file watcher created");

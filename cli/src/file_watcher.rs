@@ -4,45 +4,46 @@ use std::fs;
 use tokio::sync::mpsc;
 
 pub async fn async_watch(path: String, action_tx: mpsc::Sender<Action>) -> notify::Result<()> {
-    let (tx, mut rx) = mpsc::channel::<Action>(100);
-
+    let (tx, rx) = std::sync::mpsc::channel();
     let path_clone = path.clone();
 
-    // Automatically select the best implementation for your platform.
-    // You can also access each implementation directly e.g. INotifyWatcher.
-    let mut watcher = notify::recommended_watcher(move |res| match res {
-        Ok(event) => {
-            println!("got event: {:?}", event);
-            tokio::runtime::Runtime::new().unwrap().block_on(async {
-                let action = match watch_event_to_action(event, &path_clone) {
-                    Some(action) => {
-                        println!("Action received: {:?}", action);
-                        action
-                    }
-                    None => {
-                        println!("No action for event");
-                        return ();
-                    }
-                };
+    let mut watcher = notify::recommended_watcher(tx)?;
 
-                let _send_res = tx.send(action).await;
-            });
-        }
-        Err(e) => {
-            println!("watch error: {:?}", e);
-        }
-    })?;
+    println!("Watcher starting");
+
+    let path = "/home/tylord/dev/tabfs-rs/test";
 
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
-    watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
+    watcher.watch(&path.as_ref(), RecursiveMode::Recursive)?;
 
-    while let Some(action) = rx.recv().await {
-        println!(
-            "Received action from file watcher in file watcher: {:?}",
-            action
-        );
-        let _ = action_tx.send(action).await;
+    println!("Watcher started");
+
+    for res in rx {
+        let event = match res {
+            Ok(event) => event,
+            Err(error) => {
+                println!("watch error: {:?}", error);
+                continue;
+            }
+        };
+        println!("got event: {:?}", event);
+
+        let action = match watch_event_to_action(event, &path_clone) {
+            Some(action) => action,
+            None => {
+                println!("No action for event");
+                continue;
+            }
+        };
+        println!("Action received: {:?}", action);
+
+        match action_tx.send(action).await {
+            Ok(_res) => {}
+            Err(e) => {
+                println!("Error sending action: {:?}", e);
+            }
+        }
     }
 
     Ok(())

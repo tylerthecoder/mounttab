@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
-
   "name": "MountTab",
   "description": "Mount browser tabs to a working directory",
   "version": "1.0",
-
   "permissions": [
-    "tabs", "tabCapture", "debugger", "nativeMessaging", "management", "unlimitedStorage"
+    "tabs",
+    "tabCapture",
+    "debugger",
+    "nativeMessaging",
+    "management",
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "ws://localhost/*"
@@ -15,9 +18,7 @@
     "default_title": "Click Me",
     "default_popup": "popup.html"
   },
-
   "minimum_chrome_version": "116",
-
   "background": {
     "service_worker": "background.js"
   }
