@@ -84,15 +84,32 @@ fn watch_event_to_action(event: notify::Event, base_path: &Path) -> Option<Works
 }
 
 pub fn apply_action_to_fs(path: &Path, action: &WorkspaceAction) {
-    let is_open_file = path.join("is_open");
-    let url_file = path.join("url");
-
     match action {
-        WorkspaceAction::OpenTab(tab) => fs::write(is_open_file, "1"),
-        WorkspaceAction::CloseTab(tab) => fs::write(is_open_file, "0"),
-        WorkspaceAction::CreateTab(tab) => fs::create_dir(path),
-        WorkspaceAction::RemoveTab(tab) => fs::remove_dir(path),
-        WorkspaceAction::ChangeTabUrl(tab, url) => fs::write(url_file, url),
+        WorkspaceAction::OpenTab(tab) => {
+            let dir_path = path.join(tab);
+            let is_open_file = dir_path.join("is_open");
+            fs::write(is_open_file, "1");
+        }
+        WorkspaceAction::CloseTab(tab) => {
+            let dir_path = path.join(tab);
+            let is_open_file = dir_path.join("is_open");
+            fs::write(is_open_file, "0");
+        }
+        WorkspaceAction::CreateTab(tab) => {
+            let dir_path = path.join(tab);
+            let is_open_file = dir_path.join("is_open");
+            fs::create_dir(dir_path);
+            fs::write(is_open_file, "0");
+        }
+        WorkspaceAction::RemoveTab(tab) => {
+            fs::remove_dir(path);
+        }
+        WorkspaceAction::ChangeTabUrl(tab, url) => {
+            let dir_path = path.join(tab);
+            let url_file = dir_path.join("url_file");
+            fs::create_dir(dir_path);
+            fs::write(url_file, url);
+        }
     };
 }
 

@@ -66,7 +66,7 @@ async fn user_connected(ws: WebSocket, workspaces: WorkspaceManager) {
             let from_browser_mes = match serde_json::from_str::<FromBrowserMessage>(msg) {
                 Ok(msg) => msg,
                 Err(e) => {
-                    eprintln!("error parsing message: {}", e);
+                    eprintln!("Error serde parsing message from browser: {}", e);
                     continue;
                 }
             };

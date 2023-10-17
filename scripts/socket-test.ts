@@ -13,6 +13,20 @@ socket.onopen = () => {
         }
         console.log("Sending message", startWorkspaceMessage);
         socket.send(JSON.stringify(startWorkspaceMessage));
+
+        setTimeout(() => {
+            const worksapceAction = {
+                "WorkspaceAction": [
+                    "/home/tylord/dev/tabfs-rs/test/",
+                    {
+                        CreateTab: "gandalf"
+                    }
+                ]
+            }
+            console.log("Sending message", worksapceAction);
+            socket.send(JSON.stringify(worksapceAction));
+        }, 2000);
+
     }, 2000)
 
 
