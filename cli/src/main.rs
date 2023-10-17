@@ -1,3 +1,4 @@
+use crate::model::WorkspaceAction;
 use futures_util::stream::SplitStream;
 use futures_util::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
@@ -13,15 +14,15 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
 
-use crate::model::Action;
-
+pub mod browsers;
+pub mod daemon;
 pub mod file_watcher;
 pub mod model;
 
 #[derive(Serialize, Deserialize, Debug)]
 enum AppWebSocketMessage {
     OpenWorkspace(String),
-    WorkspaceAction(String, model::Action),
+    WorkspaceAction(String, model::WorkspaceAction),
     CloseWorkspace(String),
 }
 
@@ -47,7 +48,7 @@ struct User {
 }
 
 impl User {
-    async fn send_message<T>(&mut self, data: T) -> Result<(), ()>
+    async fn send_message<T>(&self, data: T) -> Result<(), ()>
     where
         T: Serialize,
     {
@@ -224,7 +225,7 @@ async fn user_message(my_id: usize, msg: Message, users: &UserHolder) -> Result<
         AppWebSocketMessage::OpenWorkspace(path) => {
             println!("opening workspace: {}", path);
 
-            let (tx, mut rx) = channel::<Action>(101);
+            let (tx, mut rx) = channel::<WorkspaceAction>(101);
 
             tokio::spawn(async move {
                 println!("spawning file watcher");
