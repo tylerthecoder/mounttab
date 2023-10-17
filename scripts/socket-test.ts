@@ -5,6 +5,18 @@ type Message = {
 const socket = new WebSocket("ws://127.0.0.1:3030/chat");
 socket.onopen = () => {
     console.log("Connected to socket");
+
+
+    setTimeout(() => {
+        const startWorkspaceMessage = {
+            "StartWorkspace": "/home/tylord/dev/tabfs-rs/test/"
+        }
+        console.log("Sending message", startWorkspaceMessage);
+        socket.send(JSON.stringify(startWorkspaceMessage));
+    }, 2000)
+
+
+
 }
 socket.onclose = () => {
     console.log("Disconnected from socket");
@@ -22,7 +34,7 @@ socket.onmessage = (event) => {
                 "OpenWorkspace": workspace
             }));
         }
-    } catch(err) {
+    } catch (err) {
 
 
     }

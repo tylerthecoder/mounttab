@@ -12,9 +12,7 @@ pub async fn async_watch(
 
     let mut watcher = notify::recommended_watcher(tx)?;
 
-    println!("Watcher starting");
-
-    // let path = "/home/tylord/dev/tabfs-rs/test".;
+    println!("Watcher starting: {}", path.to_str().unwrap());
 
     watcher.watch(path, RecursiveMode::Recursive)?;
 

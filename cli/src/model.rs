@@ -67,78 +67,6 @@ pub enum WorkspaceAction {
     RemoveTab(String),
 }
 
-impl Workspace {
-    pub fn new(name: String, path: String) -> Workspace {
-        Workspace {
-            name,
-            path,
-            tabs: vec![],
-        }
-    }
-
-    pub fn start_watching() -> () {}
-
-    pub fn apply_action(&mut self, action: WorkspaceAction) {
-        match action {
-            WorkspaceAction::OpenTab(tab) => self.open_tab(tab),
-            WorkspaceAction::CloseTab(tab) => self.close_tab(tab),
-            WorkspaceAction::RemoveTab(tab) => self.remove_tab(tab),
-            WorkspaceAction::CreateTab(tab) => self.create_tab(tab),
-            WorkspaceAction::ChangeTabUrl(tab, url) => self.change_tab_url(tab, url),
-        }
-    }
-
-    fn get_tab_by_name(&self, name: String) -> Option<&Tab> {
-        self.tabs.iter().find(|t| t.name == name)
-    }
-
-    fn get_tab_by_name_mut(&mut self, name: String) -> Option<&mut Tab> {
-        self.tabs.iter_mut().find(|t| t.name == name)
-    }
-
-    fn create_tab(&mut self, name: String) -> () {
-        let tab = Tab {
-            is_open: false,
-            name,
-            url: "".to_owned(),
-            id: "".to_owned(),
-        };
-
-        self.tabs.push(tab);
-    }
-
-    fn remove_tab(&mut self, name: String) -> () {
-        self.tabs.retain(|tab| tab.name != name)
-    }
-
-    fn open_tab(&mut self, name: String) -> () {
-        let tab = self.get_tab_by_name_mut(name);
-        if let Some(t) = tab {
-            t.is_open = true
-        } else {
-            println!("Couldn't find the tab")
-        }
-    }
-
-    fn close_tab(&mut self, name: String) -> () {
-        let tab = self.get_tab_by_name_mut(name);
-        if let Some(t) = tab {
-            t.is_open = false
-        } else {
-            println!("Couldn't find the tab")
-        }
-    }
-
-    fn change_tab_url(&mut self, tab_name: String, url: String) -> () {
-        let tab = self.get_tab_by_name_mut(tab_name);
-        if let Some(t) = tab {
-            t.url = url
-        } else {
-            println!("Couldn't find the tab")
-        }
-    }
-}
-
 #[derive(Default, Clone)]
 pub struct WorkspaceManager {
     workspaces: Arc<RwLock<Vec<Workspace>>>,
@@ -154,7 +82,14 @@ impl WorkspaceManager {
 
         let all_workspaces_message = ToBrowserMessage::AllWorksapces(workspaces);
 
-        browser.tx.send(all_workspaces_message);
+        match browser.tx.send(all_workspaces_message).await {
+            Ok(()) => {
+                println!("Sending message");
+            }
+            Err(err) => {
+                println!("Error sending: {}", err);
+            }
+        };
 
         while let Some(from_browser_message) = browser_rx.next().await {
             match from_browser_message {
@@ -175,6 +110,11 @@ impl WorkspaceManager {
     fn start(&self, path: &Path, browser: &Browser) {
         let path_clone = path.to_owned();
         let browser_clone = browser.clone();
+
+        // check if the workspace path is real
+        if !path.exists() {
+            eprintln!("File path doesn't exist");
+        }
 
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel::<WorkspaceAction>(101);

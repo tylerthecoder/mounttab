@@ -10,7 +10,7 @@ use warp::Filter;
 /// Our global unique user id counter.
 static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
 
-pub async fn start() -> Result<(), std::io::Error> {
+pub async fn start_daemon() -> Result<(), std::io::Error> {
     // start websocket server
 
     let worksapce_manager = WorkspaceManager::default();
@@ -36,7 +36,7 @@ async fn user_connected(ws: WebSocket, workspaces: WorkspaceManager) {
     // Use a counter to assign a new unique ID for this user.
     let my_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
 
-    eprintln!("New browser connected: {}", my_id);
+    eprintln!("New browser connected! ID: {}", my_id);
 
     let (mut user_ws_tx, mut user_ws_rx) = ws.split();
 
@@ -88,7 +88,14 @@ async fn user_connected(ws: WebSocket, workspaces: WorkspaceManager) {
 
             let msg = Message::text(action_str);
 
-            user_ws_tx.send(msg);
+            match user_ws_tx.send(msg).await {
+                Ok(()) => {
+                    println!("Sent message to socket");
+                }
+                Err(err) => {
+                    eprintln!("Error sending message: {}", err);
+                }
+            };
         }
     });
 
