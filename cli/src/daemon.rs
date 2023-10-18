@@ -71,7 +71,14 @@ async fn user_connected(ws: WebSocket, workspaces: WorkspaceManager) {
                 }
             };
 
-            from_browser_tx.send(from_browser_mes);
+            match from_browser_tx.send(from_browser_mes) {
+                Ok(()) => {
+                    println!("Message sent successfully")
+                }
+                Err(err) => {
+                    println!("Got an error sending to socket: {}", err)
+                }
+            }
         }
     });
 

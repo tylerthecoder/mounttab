@@ -1,11 +1,19 @@
+import { FromDameonMessage, TabHolder, ToDameonMessage, WorkspaceAction, applyActionToTabHolder, getNewIdFromId, updateTabId } from "./model";
+
 // Global state
 let ALL_WORKSPACES: string[] = [];
 let socket: WebSocket;
+const tabHolder: TabHolder = {
+    tabs: {},
+    idMap: {},
+};
+
+
 
 const connectToSocket = () => {
     socket = new WebSocket("ws://localhost:3030/chat");
     socket.onopen = () => {
-        console.log("Connected to socket");
+        onSocketConnected();
     }
     socket.onclose = () => {
         console.log("Disconnected from socket");
@@ -14,24 +22,87 @@ const connectToSocket = () => {
         console.log("Message received", event.data);
         const strData = event.data.toString();
         const message = JSON.parse(strData);
-        handleSocketMessage(message);
+        handleDameonMessage(message);
     }
     chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
         console.log("Chrome message received", message);
     });
 }
 
-type SocketMessage = {
-    CloseTab: string,
-    AllWorkspaces: string[]
+const onSocketConnected = async () => {
+    console.log("Connected to socket");
+    const tabs = await chrome.tabs.query({});
+
+    console.log("Tabs", tabs);
+
+    const theTab = tabs.find(tab => tab.id == 1164656399);
+
+    const workspaceId = "/home/tylord/dev/tabfs-rs/test/";
+
+    if (!theTab) {
+        throw new Error("Couldn't find tab");
+    }
+
+    const action1 = {
+        StartWorkspace: workspaceId
+    }
+    sendMessageToDaemon(action1);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    {
+        const worksapceAction: WorkspaceAction = {
+            CreateTab: String(theTab.id),
+        }
+        sendMessageToDaemon({
+            WorkspaceAction: [workspaceId, worksapceAction]
+        });
+        applyActionToTabHolder(tabHolder, worksapceAction);
+    }
+    {
+        const worksapceAction: WorkspaceAction = {
+            ChangeTabUrl: [String(theTab.id), theTab.url ?? ""],
+        }
+        sendMessageToDaemon({
+            WorkspaceAction: [workspaceId, worksapceAction]
+        });
+        applyActionToTabHolder(tabHolder, worksapceAction);
+    }
+
 }
 
-let tabs: any[] = []
-const getAllTabs = async () => {
-    tabs = await chrome.tabs.query({});
-    console.log("Tabs", tabs);
-};
-getAllTabs();
+const sendMessageToDaemon = (message: ToDameonMessage) => {
+    console.log("Sending message to daemon", message);
+    socket.send(JSON.stringify(message));
+}
+
+
+const handleDameonMessage = async (message: FromDameonMessage) => {
+    console.log("Handling dameon message", message);
+    if (message.AllWorkspaces) {
+        console.log("Setting all workspaces because of socket message", message.AllWorkspaces);
+        ALL_WORKSPACES = message.AllWorkspaces;
+    }
+
+    if (message.WorkspaceAction) {
+        applyActionToTabHolder(tabHolder, message.WorkspaceAction);
+        if (message.WorkspaceAction.ChangeTabUrl) {
+            const [tabId, url] = message.WorkspaceAction.ChangeTabUrl;
+            const realTabId = getNewIdFromId(tabHolder, tabId);
+            await chrome.tabs.update(parseInt(realTabId), { url });
+        } else if (message.WorkspaceAction.CloseTab) {
+            const tabId = message.WorkspaceAction.CloseTab;
+            const realTabId = getNewIdFromId(tabHolder, tabId);
+            await chrome.tabs.remove(parseInt(realTabId));
+        } else if (message.WorkspaceAction.OpenTab) {
+            const tab = tabHolder.tabs[message.WorkspaceAction.OpenTab];
+            const newTab = await chrome.tabs.create({
+                url: tab.url,
+            });
+            updateTabId(tabHolder, tab.id, String(newTab.id));
+        }
+    }
+}
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.type === "GetAllWorkspaces") {
@@ -46,20 +117,6 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     }
     return true
 });
-
-const handleSocketMessage = (message: SocketMessage) => {
-    if (message.AllWorkspaces) {
-        console.log("Setting all workspaces because of socket message", message.AllWorkspaces);
-        ALL_WORKSPACES = message.AllWorkspaces;
-    }
-    if (message.CloseTab) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs.length > 0) {
-                chrome.tabs.remove(tabs[0].id!);
-            }
-        });
-    }
-}
 
 connectToSocket();
 

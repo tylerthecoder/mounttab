@@ -1,6 +1,10 @@
 use crate::model::{Tab, Workspace, WorkspaceAction};
 use notify::{RecursiveMode, Watcher};
-use std::{fs, path::Path};
+use std::{
+    ffi::OsStr,
+    fs, io,
+    path::{Component, Path},
+};
 use tokio::sync::mpsc;
 
 pub async fn async_watch(
@@ -28,19 +32,16 @@ pub async fn async_watch(
         };
         println!("got event: {:?}", event);
 
-        let action = match watch_event_to_action(event, &path_clone) {
-            Some(action) => action,
-            None => {
-                println!("No action for event");
-                continue;
-            }
-        };
-        println!("Action received: {:?}", action);
+        let actions = watch_event_to_actions(event, &path_clone);
 
-        match action_tx.send(action).await {
-            Ok(_res) => {}
-            Err(e) => {
-                println!("Error sending action: {:?}", e);
+        println!("Actions received: {:?}", actions);
+
+        for action in actions {
+            match action_tx.send(action).await {
+                Ok(_res) => {}
+                Err(e) => {
+                    println!("Error sending action: {:?}", e);
+                }
             }
         }
     }
@@ -48,12 +49,12 @@ pub async fn async_watch(
     Ok(())
 }
 
-fn watch_event_to_action(event: notify::Event, base_path: &Path) -> Option<WorkspaceAction> {
+fn watch_event_to_actions(event: notify::Event, base_path: &Path) -> Vec<WorkspaceAction> {
     let canonical_path = match fs::canonicalize(base_path) {
         Ok(path) => path,
         Err(e) => {
             println!("Error canonicalizing path: {:?}", e);
-            return None;
+            return vec![];
         }
     };
 
@@ -61,56 +62,194 @@ fn watch_event_to_action(event: notify::Event, base_path: &Path) -> Option<Works
 
     match event.kind {
         notify::event::EventKind::Create(_) => {
-            let path = event.paths[0].strip_prefix(canonical_path);
+            let actions = event
+                .paths
+                .iter()
+                .filter_map(|path| {
+                    let workspace_path = path.strip_prefix(&canonical_path).ok()?;
 
-            if let Ok(path) = path {
-                return Some(WorkspaceAction::OpenTab(path.to_string_lossy().to_string()));
-            }
+                    let mut comps = workspace_path.components();
+                    let tab = comps.next()?;
+
+                    let tab_name = match tab {
+                        std::path::Component::Normal(tab_name) => {
+                            Some(tab_name.to_str().unwrap().to_string())
+                        }
+                        _ => None,
+                    }?;
+
+                    let file_name = match comps.next() {
+                        Some(Component::Normal(file_name)) => Some(file_name),
+                        None => {
+                            println!("No filename");
+                            None
+                        }
+                        _ => None,
+                    };
+
+                    // Just the directory was made
+                    if file_name == None {
+                        return Some(WorkspaceAction::CreateTab(tab_name));
+                    }
+
+                    println!("No action found");
+
+                    None
+                })
+                .collect();
+
+            return actions;
+        }
+
+        notify::EventKind::Modify(_) => {
+            let actions = event
+                .paths
+                .iter()
+                .filter_map(|path| {
+                    let workspace_path = path.strip_prefix(&canonical_path).ok()?;
+
+                    let mut comps = workspace_path.components();
+                    let tab = comps.next()?;
+
+                    let tab_name = match tab {
+                        std::path::Component::Normal(tab_name) => {
+                            Some(tab_name.to_str().unwrap().to_string())
+                        }
+                        _ => None,
+                    }?;
+
+                    println!("Tab name: {}", tab_name);
+
+                    let file_name = match comps.next() {
+                        Some(Component::Normal(file_name)) => {
+                            println!("Got file: {}", file_name.to_str().unwrap().to_string());
+                            Some(file_name)
+                        }
+                        None => {
+                            println!("No filename");
+                            None
+                        }
+                        _ => {
+                            println!("Some other component");
+                            None
+                        }
+                    };
+
+                    if file_name == Some(OsStr::new("is_open")) {
+                        let is_open = fs::read_to_string(path).ok()?;
+                        let is_open = is_open.trim();
+
+                        println!("Is open contents: {}", is_open.to_owned());
+
+                        if is_open == "1".to_string() {
+                            return Some(WorkspaceAction::OpenTab(tab_name));
+                        } else if is_open == "0".to_string() {
+                            return Some(WorkspaceAction::CloseTab(tab_name));
+                        }
+                    } else if file_name == Some(OsStr::new("url")) {
+                        let tab_url = fs::read_to_string(path).ok()?;
+                        let tab_url = tab_url.trim().to_string();
+
+                        return Some(WorkspaceAction::ChangeTabUrl(tab_name, tab_url));
+                    }
+
+                    println!("No action found");
+
+                    None
+                })
+                .collect();
+
+            return actions;
         }
         notify::event::EventKind::Remove(_) => {
-            let path = event.paths[0].strip_prefix(canonical_path);
+            let actions = event
+                .paths
+                .iter()
+                .filter_map(|path| {
+                    let workspace_path = path.strip_prefix(&canonical_path).ok()?;
 
-            if let Ok(path) = path {
-                return Some(WorkspaceAction::CloseTab(
-                    path.to_string_lossy().to_string(),
-                ));
-            }
+                    let mut comps = workspace_path.components();
+                    let tab = comps.next()?;
+
+                    let tab_name = match tab {
+                        std::path::Component::Normal(tab_name) => {
+                            Some(tab_name.to_str().unwrap().to_string())
+                        }
+                        _ => None,
+                    }?;
+
+                    let file_name = match comps.next() {
+                        Some(Component::Normal(file_name)) => Some(file_name),
+                        None => {
+                            println!("No filename");
+                            None
+                        }
+                        _ => None,
+                    };
+
+                    // Just the directory was made
+                    if file_name == None {
+                        return Some(WorkspaceAction::RemoveTab(tab_name));
+                    }
+
+                    println!("No action found");
+
+                    None
+                })
+                .collect();
+
+            return actions;
         }
         _ => {
-            println!("unhandled event: {:?}", event);
+            println!("unhandled event");
         }
     }
-    None
+
+    vec![]
 }
 
-pub fn apply_action_to_fs(path: &Path, action: &WorkspaceAction) {
+pub fn apply_action_to_fs(path: &Path, action: &WorkspaceAction) -> io::Result<()> {
     match action {
         WorkspaceAction::OpenTab(tab) => {
             let dir_path = path.join(tab);
             let is_open_file = dir_path.join("is_open");
-            fs::write(is_open_file, "1");
+            if !dir_path.exists() {
+                fs::create_dir(dir_path)?;
+            }
+            fs::write(is_open_file, "1")?;
         }
         WorkspaceAction::CloseTab(tab) => {
             let dir_path = path.join(tab);
             let is_open_file = dir_path.join("is_open");
-            fs::write(is_open_file, "0");
+            if !dir_path.exists() {
+                fs::create_dir(dir_path)?;
+            }
+            fs::write(is_open_file, "0")?;
         }
         WorkspaceAction::CreateTab(tab) => {
             let dir_path = path.join(tab);
             let is_open_file = dir_path.join("is_open");
-            fs::create_dir(dir_path);
-            fs::write(is_open_file, "0");
+            let url_file = dir_path.join("url");
+            if !dir_path.exists() {
+                fs::create_dir(dir_path)?;
+            }
+            fs::write(is_open_file, "0")?;
+            fs::write(url_file, "")?;
         }
         WorkspaceAction::RemoveTab(tab) => {
-            fs::remove_dir(path);
+            let dir_path = path.join(tab);
+            fs::remove_dir(dir_path)?;
         }
         WorkspaceAction::ChangeTabUrl(tab, url) => {
             let dir_path = path.join(tab);
-            let url_file = dir_path.join("url_file");
-            fs::create_dir(dir_path);
-            fs::write(url_file, url);
+            let url_file = dir_path.join("url");
+            if !dir_path.exists() {
+                fs::create_dir(dir_path)?;
+            }
+            fs::write(url_file, url)?;
         }
     };
+    Ok(())
 }
 
 impl Workspace {

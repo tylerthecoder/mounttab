@@ -91,23 +91,38 @@ impl WorkspaceManager {
             }
         };
 
+        let ignore_next_action = Arc::<RwLock<bool>>::new(RwLock::new(false));
+
         while let Some(from_browser_message) = browser_rx.next().await {
             match from_browser_message {
                 FromBrowserMessage::StartWorkspace(path) => {
+                    let lock = Arc::clone(&ignore_next_action);
                     let path = Path::new(&path);
                     // maybe launch this in a thread
-                    self.start(path, browser);
+                    self.start(path, browser, lock);
                 }
                 FromBrowserMessage::WorkspaceAction(path, action) => {
+                    let lock = Arc::clone(&ignore_next_action);
                     // apply action to workspace path
                     let path = Path::new(&path);
-                    apply_action_to_fs(path, &action)
+                    // we should stop the file watcher when we send this, or at least tell it to
+                    // ignore the next event
+                    let mut w = lock.write().await;
+                    *w = true;
+                    match apply_action_to_fs(path, &action) {
+                        Ok(()) => {
+                            println!("Applied action to fs");
+                        }
+                        Err(err) => {
+                            println!("Error applying action to fs {}", err);
+                        }
+                    }
                 }
             }
         }
     }
 
-    fn start(&self, path: &Path, browser: &Browser) {
+    fn start(&self, path: &Path, browser: &Browser, ignore_next_action: Arc<RwLock<bool>>) {
         let path_clone = path.to_owned();
         let browser_clone = browser.clone();
 
@@ -128,6 +143,14 @@ impl WorkspaceManager {
             });
 
             while let Some(action) = rx.recv().await {
+                println!("Got message from file watcher");
+                // let should_ignore = ignore_next_action.read().await;
+                //
+                // if *should_ignore {
+                //     let mut ignore_lock = ignore_next_action.write().await;
+                //     println!("Ignoring action from file watcher: {:?}", action);
+                //     *ignore_lock = false;
+                // }
                 println!("Received action from file watcher: {:?}", action);
 
                 let b_action = ToBrowserMessage::WorkspaceAction(action.to_owned());
