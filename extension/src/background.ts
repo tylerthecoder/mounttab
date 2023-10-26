@@ -1,14 +1,12 @@
-import { FromDameonMessage, TabHolder, ToDameonMessage, WorkspaceAction, applyActionToTabHolder, getNewIdFromId, updateTabId } from "./model";
+import { FromDameonMessage, TabHolder, ToDameonMessage, Workspace, WorkspaceAction, applyActionToTabHolder, getNewIdFromId, updateTabId } from "./model";
 
 // Global state
-let ALL_WORKSPACES: string[] = [];
+let ALL_WORKSPACES: Workspace[] = [];
 let socket: WebSocket;
 const tabHolder: TabHolder = {
     tabs: {},
     idMap: {},
 };
-
-
 
 const connectToSocket = () => {
     socket = new WebSocket("ws://localhost:3030/chat");
@@ -24,9 +22,6 @@ const connectToSocket = () => {
         const message = JSON.parse(strData);
         handleDameonMessage(message);
     }
-    chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
-        console.log("Chrome message received", message);
-    });
 }
 
 const onSocketConnected = async () => {
@@ -35,7 +30,7 @@ const onSocketConnected = async () => {
 
     console.log("Tabs", tabs);
 
-    const theTab = tabs.find(tab => tab.id == 1164656399);
+    const theTab = tabs.find(tab => tab.id == 1164657125);
 
     const workspaceId = "/home/tylord/dev/tabfs-rs/test/";
 
@@ -102,18 +97,22 @@ const handleDameonMessage = async (message: FromDameonMessage) => {
             updateTabId(tabHolder, tab.id, String(newTab.id));
         }
     }
+
+    if (message.LoadWorkspace) {
+        await chrome.windows.create({});
+    }
 }
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+    console.log("Message from popup", request);
     if (request.type === "GetAllWorkspaces") {
         console.log("Sending all workspaces", ALL_WORKSPACES);
         sendResponse(ALL_WORKSPACES);
     }
     if (request.type === "SelectWorkspace") {
-        console.log("Selecting workspace request, sending socket message", request.workspace);
-        socket.send(JSON.stringify({
-            "OpenWorkspace": request.workspace
-        }));
+        sendMessageToDaemon({
+            StartWorkspace: request.workspace,
+        })
     }
     return true
 });

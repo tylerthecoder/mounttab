@@ -256,7 +256,8 @@ impl Workspace {
     pub fn new_from_fs(path: &Path) -> Workspace {
         let tab_dirs = fs::read_dir(path);
         Workspace {
-            name: "".to_owned(),
+            id: "".to_owned(),
+            name: "Testing".to_owned(),
             tabs: tab_dirs
                 .unwrap()
                 .into_iter()

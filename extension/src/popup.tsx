@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { Workspace } from "./model";
 
-type Workspace = string;
 
 const Popup = () => {
     const [data, setData] = React.useState<Workspace[]>();
@@ -14,8 +14,8 @@ const Popup = () => {
     }, []);
 
 
-    const selectWorkspace = (workspace: Workspace) => {
-        chrome.runtime.sendMessage({ type: "SelectWorkspace", workspace }, (response: Workspace[]) => {
+    const selectWorkspace = (workspace_id: string) => {
+        chrome.runtime.sendMessage({ type: "SelectWorkspace", workspace: workspace_id }, (response: Workspace[]) => {
 
         });
     }
@@ -26,8 +26,8 @@ const Popup = () => {
                 {data && data.map((workspace) => {
                     return (
                         <div>
-                            <p> {workspace} </p>
-                            <button onClick={() => selectWorkspace(workspace)}> Launch </button>
+                            <p> {workspace.name} </p>
+                            <button onClick={() => selectWorkspace(workspace.id)}> Launch </button>
                         </div>
                     );
                 })}

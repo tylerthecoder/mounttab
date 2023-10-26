@@ -15,6 +15,8 @@ pub async fn start_daemon() -> Result<(), std::io::Error> {
 
     let worksapce_manager = WorkspaceManager::default();
 
+    worksapce_manager.load_workspaces().await;
+
     let workspaces = warp::any().map(move || worksapce_manager.clone());
 
     // GET /chat -> websocket upgrade
@@ -66,7 +68,10 @@ async fn user_connected(ws: WebSocket, workspaces: WorkspaceManager) {
             let from_browser_mes = match serde_json::from_str::<FromBrowserMessage>(msg) {
                 Ok(msg) => msg,
                 Err(e) => {
-                    eprintln!("Error serde parsing message from browser: {}", e);
+                    eprintln!(
+                        "Error serde parsing message from browser(msg: {}): {}",
+                        msg, e
+                    );
                     continue;
                 }
             };

@@ -7,8 +7,15 @@ export type ToDameonMessage = {
 }
 
 export type FromDameonMessage = {
-    AllWorkspaces?: WorkspaceId[],
+    AllWorkspaces?: Workspace[],
     WorkspaceAction?: WorkspaceAction,
+    LoadWorkspace?: Workspace,
+}
+
+export type Workspace = {
+    id: WorkspaceId,
+    name: string,
+    tabs: TabId[],
 }
 
 export type WorkspaceAction = {
@@ -17,7 +24,6 @@ export type WorkspaceAction = {
     ChangeTabUrl?: [TabId, string]
     CreateTab?: TabId,
 }
-
 
 export type Tab = {
     id: string,

@@ -9,12 +9,13 @@ use tokio_stream::StreamExt;
 
 #[derive(Serialize, Deserialize)]
 pub enum ToBrowserMessage {
-    AllWorksapces(Vec<Workspace>),
+    AllWorkspaces(Vec<Workspace>),
     // Only send to the browser when it is "connected" to a workspace
     WorkspaceAction(WorkspaceAction),
+    LoadWorkspace(ApiWorkspace),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum FromBrowserMessage {
     // User wants to start sending actions from this worksapce to this browser.
     StartWorkspace(String),
@@ -37,8 +38,16 @@ enum AppAction {
 /** A workspace is a directory on the computer that contains all the tabs */
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Workspace {
+    pub id: String,
     pub name: String,
     pub path: String,
+    pub tabs: Vec<Tab>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ApiWorkspace {
+    pub id: String,
+    pub name: String,
     pub tabs: Vec<Tab>,
 }
 
@@ -73,6 +82,15 @@ pub struct WorkspaceManager {
 }
 
 impl WorkspaceManager {
+    pub async fn load_workspaces(&self) {
+        println!("Loading workspaces");
+        let mut workspaces = self.workspaces.write().await;
+        workspaces.push(Workspace::new_from_fs(
+            "/home/tylord/dev/tabfs-rs/test".as_ref(),
+        ));
+        println!("Loaded {} workspaces", workspaces.len());
+    }
+
     pub async fn browser_connected(
         &self,
         browser: &Browser,
@@ -80,7 +98,7 @@ impl WorkspaceManager {
     ) {
         let workspaces = self.get_all_workspaces().await;
 
-        let all_workspaces_message = ToBrowserMessage::AllWorksapces(workspaces);
+        let all_workspaces_message = ToBrowserMessage::AllWorkspaces(workspaces);
 
         match browser.tx.send(all_workspaces_message).await {
             Ok(()) => {
@@ -94,12 +112,12 @@ impl WorkspaceManager {
         let ignore_next_action = Arc::<RwLock<bool>>::new(RwLock::new(false));
 
         while let Some(from_browser_message) = browser_rx.next().await {
+            println!("Got message from browser: {:?}", from_browser_message);
             match from_browser_message {
-                FromBrowserMessage::StartWorkspace(path) => {
+                FromBrowserMessage::StartWorkspace(id) => {
                     let lock = Arc::clone(&ignore_next_action);
-                    let path = Path::new(&path);
                     // maybe launch this in a thread
-                    self.start(path, browser, lock);
+                    self.start(id, browser, lock).await;
                 }
                 FromBrowserMessage::WorkspaceAction(path, action) => {
                     let lock = Arc::clone(&ignore_next_action);
@@ -122,20 +140,48 @@ impl WorkspaceManager {
         }
     }
 
-    fn start(&self, path: &Path, browser: &Browser, ignore_next_action: Arc<RwLock<bool>>) {
-        let path_clone = path.to_owned();
+    async fn start(
+        &self,
+        workspace_id: String,
+        browser: &Browser,
+        ignore_next_action: Arc<RwLock<bool>>,
+    ) {
+        println!("Starting workspace: {:?}", workspace_id);
+
+        let workspaces = self.get_all_workspaces().await;
+
+        let workspace = workspaces
+            .iter()
+            .find(|workspace| workspace.id == workspace_id)
+            .unwrap_or_else(|| panic!("Couldn't find workspace with id: {}", workspace_id.clone()))
+            .clone();
+
         let browser_clone = browser.clone();
 
         // check if the workspace path is real
-        if !path.exists() {
-            eprintln!("File path doesn't exist");
-        }
+        // if !workspace.path.exists() {
+        //     eprintln!("File path doesn't exist");
+        // }
+
+        // let workspace = Workspace::new_from_fs(path);
+
+        let b_action = ToBrowserMessage::LoadWorkspace(ApiWorkspace {
+            tabs: workspace.tabs.clone(),
+            id: workspace.id.clone(),
+            name: workspace.name.clone(),
+        });
+
+        browser.tx.send(b_action).await.unwrap_or_else(|e| {
+            eprintln!("Error sending to browser: {}", e);
+        });
+
+        println!("Sent load workspace message");
 
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel::<WorkspaceAction>(101);
             println!("spawning file watcher");
             tokio::spawn(async move {
-                let res = file_watcher::async_watch(&path_clone, tx).await;
+                let res = file_watcher::async_watch(&workspace.path.as_ref(), tx).await;
                 if let Err(e) = res {
                     eprintln!("error watching file: {}", e);
                 }
