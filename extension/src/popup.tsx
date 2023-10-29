@@ -7,6 +7,11 @@ const Popup = () => {
     const [data, setData] = React.useState<Workspace[]>();
 
     React.useEffect(() => {
+        chrome.tabs.getCurrent((tab) => {
+            console.log("Current Tab", tab);
+        });
+
+
         chrome.runtime.sendMessage({ type: "GetAllWorkspaces" }, (response: Workspace[]) => {
             console.log("Got Response", response);
             setData(response)

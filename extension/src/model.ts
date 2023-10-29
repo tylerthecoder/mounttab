@@ -15,52 +15,62 @@ export type FromDameonMessage = {
 export type Workspace = {
     id: WorkspaceId,
     name: string,
-    tabs: TabId[],
+    tabs: Tab[],
 }
 
 export type WorkspaceAction = {
     OpenTab?: TabId,
     CloseTab?: TabId,
     ChangeTabUrl?: [TabId, string]
-    CreateTab?: TabId,
+    CreateTab?: Tab,
 }
 
 export type Tab = {
-    id: string,
+    name: string,
     is_open: boolean,
     url: string,
 }
 
+export class TabHolder {
+    private idMap: Record<TabId, TabId> = {};
+    private tabs: Record<TabId, Tab> = {};
 
-export type TabHolder = {
-    // new id to old id
-    idMap: Record<TabId, TabId>,
-    tabs: Record<TabId, Tab>,
-}
+    constructor() { }
 
-export const updateTabId = (holder: TabHolder, old_id: string, new_id: string) => {
-    holder.idMap[old_id] = new_id;
-    console.log("updated Id map tab id", holder.idMap);
-}
-
-export const getNewIdFromId = (holder: TabHolder, id: string) => {
-    if (id in holder.idMap) {
-        return holder.idMap[id];
+    setTabId(tabName: string, browserTabId: string) {
+        this.idMap[tabName] = browserTabId;
     }
-    return id;
-}
 
-export const applyActionToTabHolder = (holder: TabHolder, action: WorkspaceAction) => {
-    console.log("Applying action to tab holder", action);
-    if (action.OpenTab) {
-        holder.tabs[action.OpenTab].is_open = true;
-    } else if (action.CloseTab) {
-        holder.tabs[action.CloseTab].is_open = false;
-    } else if (action.CreateTab) {
-        holder.tabs[action.CreateTab] = { id: action.CreateTab, is_open: false, url: "" };
-    } else if (action.ChangeTabUrl) {
-        const [tabId, url] = action.ChangeTabUrl;
-        holder.tabs[tabId].url = url;
+    getTabNameFromBrowserTabId(browserTabId: string) {
+        for (const [key, value] of Object.entries(this.idMap)) {
+            if (value === browserTabId) {
+                return key;
+            }
+        }
+        return null;
     }
-    console.log("New tab holder", holder);
+
+    getChromeTabId(modelId: string) {
+        return this.idMap[modelId];
+    }
+
+    getTabById(tabId: string) {
+        return this.tabs[tabId];
+    }
+
+    applyAction(action: WorkspaceAction) {
+        console.log("Applying action to tab holder", action);
+        if (action.OpenTab) {
+            this.tabs[action.OpenTab].is_open = true;
+        } else if (action.CloseTab) {
+            this.tabs[action.CloseTab].is_open = false;
+        } else if (action.CreateTab) {
+            this.tabs[action.CreateTab.name] = action.CreateTab;
+        } else if (action.ChangeTabUrl) {
+            const [tabId, url] = action.ChangeTabUrl;
+            this.tabs[tabId].url = url;
+        }
+        console.log("New tab holder", this);
+    }
+
 }

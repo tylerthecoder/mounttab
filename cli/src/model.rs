@@ -60,10 +60,10 @@ pub struct ApiWorkspace {
  * */
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Tab {
+    // The name should be unique across all tabs functions as an id
     pub name: String,
     pub url: String,
     pub is_open: bool,
-    pub id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -98,7 +98,7 @@ impl WorkspaceManager {
     ) {
         let workspaces = self.get_all_workspaces().await;
 
-        let all_workspaces_message = ToBrowserMessage::AllWorkspaces(workspaces);
+        let all_workspaces_message = ToBrowserMessage::AllWorkspaces(workspaces.clone());
 
         match browser.tx.send(all_workspaces_message).await {
             Ok(()) => {
@@ -119,15 +119,21 @@ impl WorkspaceManager {
                     // maybe launch this in a thread
                     self.start(id, browser, lock).await;
                 }
-                FromBrowserMessage::WorkspaceAction(path, action) => {
+                FromBrowserMessage::WorkspaceAction(id, action) => {
                     let lock = Arc::clone(&ignore_next_action);
-                    // apply action to workspace path
-                    let path = Path::new(&path);
+                    let workspace = workspaces
+                        .clone()
+                        .iter()
+                        .find(|workspace| workspace.id == id)
+                        .unwrap_or_else(|| {
+                            panic!("Couldn't find workspace with id: {}", id.clone())
+                        })
+                        .clone();
                     // we should stop the file watcher when we send this, or at least tell it to
                     // ignore the next event
                     let mut w = lock.write().await;
                     *w = true;
-                    match apply_action_to_fs(path, &action) {
+                    match apply_action_to_fs(&workspace.path.as_ref(), &action) {
                         Ok(()) => {
                             println!("Applied action to fs");
                         }

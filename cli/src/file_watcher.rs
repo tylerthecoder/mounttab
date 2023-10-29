@@ -4,6 +4,7 @@ use std::{
     ffi::OsStr,
     fs, io,
     path::{Component, Path},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use tokio::sync::mpsc;
 
@@ -242,21 +243,27 @@ pub fn apply_action_to_fs(path: &Path, action: &WorkspaceAction) -> io::Result<(
         }
         WorkspaceAction::ChangeTabUrl(tab, url) => {
             let dir_path = path.join(tab);
+            println!("dir path: {}", dir_path.to_str().unwrap());
             let url_file = dir_path.join("url");
             if !dir_path.exists() {
                 fs::create_dir(dir_path)?;
             }
+            println!("Writing url: {}", url_file.to_str().unwrap());
             fs::write(url_file, url)?;
         }
     };
     Ok(())
 }
 
+static NEXT_WORKSPACE_ID: AtomicUsize = AtomicUsize::new(1);
+
 impl Workspace {
     pub fn new_from_fs(path: &Path) -> Workspace {
         let tab_dirs = fs::read_dir(path);
+        let workspace_id = NEXT_WORKSPACE_ID.fetch_add(1, Ordering::Relaxed);
+
         Workspace {
-            id: "".to_owned(),
+            id: workspace_id.to_string(),
             name: "Testing".to_owned(),
             tabs: tab_dirs
                 .unwrap()
@@ -276,7 +283,6 @@ impl Workspace {
             name: tab_name.as_os_str().to_str().unwrap().to_string(),
             is_open: fs::read_to_string(is_open_file).unwrap() == "1",
             url: fs::read_to_string(url_file).unwrap(),
-            id: "".to_owned(),
         }
     }
 }
