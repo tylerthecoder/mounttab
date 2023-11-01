@@ -1,5 +1,6 @@
 export type WorkspaceId = string;
 export type TabId = string;
+export type TabName = string;
 
 export type ToDameonMessage = {
     StartWorkspace?: WorkspaceId
@@ -22,7 +23,7 @@ export type WorkspaceAction = {
     OpenTab?: TabId,
     CloseTab?: TabId,
     ChangeTabUrl?: [TabId, string]
-    CreateTab?: Tab,
+    CreateTab?: TabName,
 }
 
 export type Tab = {

@@ -101,6 +101,32 @@ const handleDameonMessage = async (message: FromDameonMessage) => {
         const tabs = message.LoadWorkspace.tabs;
         const window = await chrome.windows.create({});
 
+        const currentTabs = await chrome.tabs.query({
+            windowId: window.id,
+        });
+
+        for (const tab of tabs) {
+            const chromeTab = await chrome.tabs.create({
+                windowId: window.id,
+                url: tab.url,
+            });
+            if (!chromeTab.id) {
+                throw new Error("Chrome tab id was null");
+            }
+
+
+            tabHolder.setTabId(tab.name, chromeTab.id.toString());
+
+            tabHolder.applyAction({
+                CreateTab: tab.name,
+            });
+        }
+
+        // remove the default tab
+        for (const tab of currentTabs) {
+            await chrome.tabs.remove(tab.id ?? 0);
+        }
+
         chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             const tabName = tabHolder.getTabNameFromBrowserTabId(String(tabId));
 
@@ -121,22 +147,39 @@ const handleDameonMessage = async (message: FromDameonMessage) => {
             }
         });
 
-        for (const tab of tabs) {
-            const chromeTab = await chrome.tabs.create({
-                windowId: window.id,
-                url: tab.url,
+        chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+            const tabName = tabHolder.getTabNameFromBrowserTabId(String(tabId));
+
+            if (!tabName) {
+                console.log("Unknown tab")
+                return;
+            }
+
+            console.log("Tab removed", tabId, removeInfo);
+
+            const worksapceAction: WorkspaceAction = {
+                CloseTab: tabName,
+            }
+
+            sendMessageToDaemon({
+                WorkspaceAction: [workspaceId, worksapceAction]
             });
-            if (!chromeTab.id) {
-                throw new Error("Chrome tab id was null");
+        });
+
+        chrome.tabs.onCreated.addListener((tab) => {
+            const tabName = Math.random().toString();
+
+            const worksapceAction: WorkspaceAction = {
+                CreateTab: tabName,
             }
 
 
-            tabHolder.setTabId(tab.name, chromeTab.id.toString());
+            tabHolder.setTabId(tabName, String(tab.id));
 
-            tabHolder.applyAction({
-                CreateTab: tab,
+            sendMessageToDaemon({
+                WorkspaceAction: [workspaceId, worksapceAction]
             });
-        }
+        });
     }
 }
 
