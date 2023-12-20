@@ -262,17 +262,19 @@ impl Workspace {
         let tab_dirs = fs::read_dir(path);
         let workspace_id = NEXT_WORKSPACE_ID.fetch_add(1, Ordering::Relaxed);
 
-        Workspace {
-            id: workspace_id.to_string(),
-            name: "Testing".to_owned(),
-            tabs: tab_dirs
-                .unwrap()
-                .into_iter()
-                .map(|d| Workspace::read_tab_from_dir(&d.unwrap().path()))
-                .into_iter()
-                .collect(),
-            path: path.to_str().unwrap().to_owned(),
-        }
+        panic!("Not implemented");
+
+        // Workspace {
+        //     id: workspace_id.to_string(),
+        //     name: "Testing".to_owned(),
+        //     tabs: tab_dirs
+        //         .unwrap()
+        //         .into_iter()
+        //         .map(|d| Workspace::read_tab_from_dir(&d.unwrap().path()))
+        //         .into_iter()
+        //         .collect(),
+        //     path: path.to_str().unwrap().to_owned(),
+        // }
     }
 
     fn read_tab_from_dir(tab_dir: &Path) -> Tab {

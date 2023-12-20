@@ -1,30 +1,30 @@
-# MountTab
+# Mount Tab
 
-A program that can mount the tabs that are open as a file system. Be able to save and relaunch sessions. Inspired by https://omar.website/tabfs/
+Mount Tab syncs your open browser tabs to a file system.
 
-Sessions are stored anywhere. You select the session that a Chrome window attaches to from the extension.
+Now you can store and launch sessions to certain file systems. 
 
-## Questions
-- How do I distinguish between multiple browser sessions? 
-    - You have to select the session from the browser.
+Inspired by https://omar.website/tabfs/
 
-## Goals
-- Eventually I want to do this with tmux sessions and PDFs. I want a way to save my full OS session and store in a working directory. 
+## Usage
+
+`mounttab start`
+
+Opens a new browser session. Reads the contents of `mount-tab.json`. As new tabs are made, the file is updated.
+
+## Development
+`bun build.ts`
 
 ## Philosophy
+
+I find myself having tabs open for a project and switching projects a lot. Starting on an old project is harder when it takes longer to get back into it. 
+
 Everything should be a file and a user of a program should be able to use the built-in Unix tools to manage data. Users should be able to build different frontends on top of the data.
 
 Don't remake a way to do version control or storage. Let the user store the data where they want and be able to sync the files using the tools they want
 
+## To-do
 
-## Tech Stuff
+Make a JSON option to store the data. 
 
-Step 1 is to start a session. Must do this in a directory with the mounttab command. `mounttab start <session-name>`
-
-The session will become visible in the Chrome extension. You can connect it to it by selecting it in the window. 
-
-There are two ways of connecting: opening all the tabs listed in the directory on the session in a new Chrome window, or overriding all the tabs with the currently open tabs of the Chrome window.
-
-
-
-
+Eventually I want to do this with tmux sessions and PDFs. I want a way to save my full OS session and store in a working directory. 
