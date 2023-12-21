@@ -1,5 +1,3 @@
-use crate::file_watcher;
-use crate::file_watcher::apply_action_to_fs;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;

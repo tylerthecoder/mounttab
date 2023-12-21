@@ -1,17 +1,17 @@
-use crate::model2::{WorkspaceAction, WorkspaceComs};
+use crate::{app::WorkspaceManger, model2::WorkspaceAction};
 use futures_util::{SinkExt, StreamExt};
 use warp::{
     filters::ws::{Message, WebSocket},
     Filter,
 };
 
-pub async fn start_web_server(workspace_coms: WorkspaceComs) {
-    let workspace_middleware = warp::any().map(move || workspace_coms.clone());
+pub async fn start_web_server(workman: WorkspaceManger) {
+    let workspace_middleware = warp::any().map(move || workman.clone());
 
     let connect_to_workspace = warp::path("chat")
         .and(warp::ws())
         .and(workspace_middleware)
-        .map(|ws: warp::ws::Ws, workspace_coms: WorkspaceComs| {
+        .map(|ws: warp::ws::Ws, workspace_coms: WorkspaceManger| {
             // This will call our function if the handshake succeeds.
             ws.on_upgrade(move |socket| client_connected(socket, workspace_coms))
         });
@@ -20,7 +20,7 @@ pub async fn start_web_server(workspace_coms: WorkspaceComs) {
     warp::serve(server_app).run(([127, 0, 0, 1], 3030)).await;
 }
 
-async fn client_connected(socket: WebSocket, coms: WorkspaceComs) {
+async fn client_connected(socket: WebSocket, coms: WorkspaceManger) {
     // try to connect the user to the worksapce, if someone is already connected, then log an error
     let (mut user_ws_tx, mut user_ws_rx) = socket.split();
 

@@ -2,10 +2,8 @@ use clap::{Parser, Subcommand};
 
 use crate::app::start_app;
 pub mod app;
-pub mod file_watcher;
 pub mod json_storage;
 pub mod model2;
-pub mod web_server;
 pub mod web_server_2;
 
 #[derive(Parser)]
@@ -36,7 +34,7 @@ async fn main() {
                 None => std::env::current_dir().unwrap(),
             };
 
-            match start_app(&path).await {
+            match start_app(path).await {
                 Ok(d) => {
                     println!("Program ended");
                 }
