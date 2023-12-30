@@ -1,4 +1,4 @@
-use crate::{app::WorkspaceManger, model2::Workspace};
+use crate::model::{Workspace, WorkspaceManger};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{fs, path::PathBuf};
 
@@ -45,7 +45,12 @@ pub fn start_file_watcher(workman: &WorkspaceManger, path: PathBuf) {
 }
 
 async fn listen_for_actions(workman: &WorkspaceManger, path: PathBuf) {
-    while let Ok((source, action)) = workman.tx.subscribe().recv().await {
+    println!("Listening for actions");
+    while let Ok((source, action)) = workman.tx.subscribe().recv().await.map_err(|err| {
+        eprintln!("Error receiving message from workspace manager: {}", err);
+    }) {
+        println!("Got action {:?} from: {}", action, source);
+
         if source == "fs" {
             continue;
         }
@@ -58,15 +63,11 @@ async fn listen_for_actions(workman: &WorkspaceManger, path: PathBuf) {
             eprintln!("Error saving workspace to file");
         });
     }
+    println!("Done printing actions");
 }
 
 async fn watch_file(workman: &WorkspaceManger, path: PathBuf) -> Result<(), ()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
-
-    // notify::recommended_watcher(tx)
-    //     .map_err(|err| eprintln!("Error creating watcher: {}", err))?
-    //     .watch(&path, RecursiveMode::Recursive)
-    //     .map_err(|err| eprintln!("Error watching path: {}", err))?;
 
     let mut watcher: RecommendedWatcher = Watcher::new(
         move |res: Result<Event, notify::Error>| {
@@ -87,13 +88,19 @@ async fn watch_file(workman: &WorkspaceManger, path: PathBuf) -> Result<(), ()> 
     println!("Watcher started");
 
     while let Some(_event) = rx.recv().await {
+        println!("Got event: {:?}", _event);
+
         let new_workspace = Workspace::from_path(&path);
         let workspace = workman.workspace.read().await;
         let actions = workspace.actions_from_diff(new_workspace);
         for action in actions {
-            workman.tx.send(("fs", action)).map_err(|err| {
+            println!("Sending action to workspace manager: {:?}", action);
+
+            let count = workman.tx.send(("fs", action)).map_err(|err| {
                 eprintln!("Error sending message to workspace manager: {}", err);
             })?;
+
+            println!("Num recieved: {:?}", count);
         }
     }
 

@@ -1,157 +1,106 @@
-use crate::model::{FromBrowserMessage, ToBrowserMessage, WorkspaceManager};
+use crate::{app::WorkspaceManger, model::WorkspaceAction};
 use futures_util::{SinkExt, StreamExt};
-use std::convert::Infallible;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::sync::mpsc;
-use warp::ws::{Message, WebSocket};
-use warp::Filter;
+use warp::{
+    filters::ws::{Message, WebSocket},
+    Filter,
+};
 
-pub async fn start_web_server(workspace_manager: WorkspaceManager) {
-    let workspace_manager = warp::any().map(move || workspace_manager.clone());
-
-    let start_workspace = warp::path("start_workspace")
-        .and(workspace_manager.clone())
-        .and(warp::path::param())
-        .map(
-            |workspace_manager: WorkspaceManager, workspace_id: String| {
-                workspace_manager.start(workspace_id);
-                "Ok"
-            },
-        );
-
-    let get_all_workspaces = warp::path("get_all_workspaces")
-        .and(workspace_manager.clone())
-        .and_then(get_api_workspaces);
+pub async fn start_web_server(workman: WorkspaceManger) {
+    let workspace_middleware = warp::any().map(move || workman.clone());
 
     let connect_to_workspace = warp::path("chat")
         .and(warp::ws())
-        .and(workspace_manager)
-        .map(|ws: warp::ws::Ws, worksapce_manager| {
+        .and(workspace_middleware.clone())
+        .map(|ws: warp::ws::Ws, workspace_coms: WorkspaceManger| {
             // This will call our function if the handshake succeeds.
-            ws.on_upgrade(move |socket| user_connected(socket, worksapce_manager))
+            ws.on_upgrade(move |socket| client_connected(socket, workspace_coms))
         });
 
-    let server_app = warp::get().and(start_workspace.or(connect_to_workspace));
+    let get_tabs = warp::path("tabs").and(workspace_middleware).and_then(
+        |workspace_coms: WorkspaceManger| async move {
+            let workspace = workspace_coms.workspace.read().await;
+            let tabs = &workspace.tabs;
+            match serde_json::to_string(tabs) {
+                Ok(json) => Ok(warp::reply::json(&json)),
+                Err(e) => {
+                    println!("There was an error serializing the tabs: {}", e);
+                    Err(warp::reject::not_found())
+                }
+            }
+        },
+    );
 
+    let server_app = warp::get().and(connect_to_workspace.or(get_tabs));
     warp::serve(server_app).run(([127, 0, 0, 1], 3030)).await;
 }
 
-async fn get_api_workspaces(
-    workspace_manager: WorkspaceManager,
-) -> Result<impl warp::Reply, Infallible> {
-    let workspaces = workspace_manager.get_all_workspaces().await;
-    let api_workspaces: Vec<crate::model::ApiWorkspace> = workspaces
-        .iter()
-        .map(|workspace| workspace.to_api_workspace())
-        .collect();
-    Ok(warp::reply::json(&api_workspaces))
-}
+async fn client_connected(socket: WebSocket, coms: WorkspaceManger) {
+    println!("Client connected");
 
-static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
+    // try to connect the user to the worksapce, if someone is already connected, then log an error
+    let (mut user_ws_tx, mut user_ws_rx) = socket.split();
 
-async fn user_connected(ws: WebSocket, workspaces: WorkspaceManager) {
-    // Use a counter to assign a new unique ID for this user.
-    let my_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
-
-    eprintln!("New browser connected! ID: {}", my_id);
-
-    let (mut user_ws_tx, mut user_ws_rx) = ws.split();
-
-    // convert the websocket streams to tokio streams
-    let (to_browser_tx, mut to_browser_rx) = mpsc::channel::<ToBrowserMessage>(my_id);
-
-    let mut workspace_clone = workspaces.clone();
+    let coms_clone = coms.clone();
 
     // Recieves message from websocket and calls function on workspace manager
     tokio::task::spawn(async move {
         while let Some(msg_res) = user_ws_rx.next().await {
-            let res = msg_res
-                .map_err(|err| println!("Error reading message from websocket: {}", err))
-                .and_then(|msg| {
-                    msg.to_str()
-                        .map_err(|err| println!("Error converting message to string"))
-                })
-                .and_then(|msg| {
-                    serde_json::from_str::<FromBrowserMessage>(msg).map_err(|err| {
-                        println!("Error deserializing message from browser: {}", err)
-                    })
-                });
+            // Use an async block to process each message
+            let res: Result<_, ()> = async {
+                let msg = msg_res.map_err(|err| {
+                    eprintln!("Error reading message from websocket: {}", err);
+                    ()
+                })?;
 
-            match res {
-                Ok(from_browser_message) => match from_browser_message {},
-                Err(err) => {
-                    eprintln!("Error reading message from websocket");
-                }
+                let str_msg = msg.to_str().map_err(|_e| {
+                    eprintln!("Error converting message to string");
+                })?;
+
+                let from_client: WorkspaceAction =
+                    serde_json::from_str(str_msg).map_err(|err| {
+                        eprintln!("Error deserializing message from browser: {}", err);
+                        ()
+                    })?;
+
+                coms_clone.tx.send(("Socket", from_client)).map_err(|err| {
+                    eprintln!("Error sending message to workspace manager: {}", err);
+                    ()
+                })?;
+
+                Ok(())
             }
+            .await;
 
-            // let msg = match msg_res {
-            //     Ok(msg) => msg,
-            //     Err(e) => {
-            //         eprintln!("websocket error(uid={}): {}", my_id, e);
-            //         continue;
-            //     }
-            // };
-
-            let msg = if let Ok(s) = msg.to_str() {
-                s
-            } else {
-                eprintln!("Message not a string");
-                continue;
-            };
-
-            let from_browser_mes = match serde_json::from_str::<FromBrowserMessage>(msg) {
-                Ok(msg) => msg,
-                Err(e) => {
-                    eprintln!(
-                        "Error serde parsing message from browser(msg: {}): {}",
-                        msg, e
-                    );
-                    continue;
-                }
-            };
-
-            match from_browser_mes {
-                FromBrowserMessage::StartWorkspace(id) => {
-                    // workspace_clone.add_listener(to_browser_tx, id).await;
-                }
-                FromBrowserMessage::WorkspaceAction(id, action) => {
-                    workspace_clone.apply_action_to_workspace(id, action).await;
-                }
+            if let Err(_) = res {
+                eprintln!("Error processing message");
             }
         }
     });
 
-    // Wait for messages and send them to the tx
-    while let Some(to_browser_message) = to_browser_rx.recv().await {
-        let action_str = match serde_json::to_string(&to_browser_message) {
-            Ok(str) => str,
-            Err(e) => {
+    while let Ok((action_source, action)) = coms.tx.subscribe().recv().await {
+        println!("Socket got action {:?} from: {}", action, action_source);
+
+        if action_source == "Socket" {
+            continue;
+        }
+
+        let res: Result<_, ()> = async {
+            let action_str = serde_json::to_string(&action).map_err(|e| {
                 eprintln!("error serializing action: {}", e);
-                continue;
-            }
-        };
+            })?;
 
-        let msg = Message::text(action_str);
+            let msg = Message::text(action_str);
 
-        match user_ws_tx.send(msg).await {
-            Ok(()) => {
-                println!("Sent message to socket");
-            }
-            Err(err) => {
-                eprintln!("Error sending message: {}", err);
-            }
-        };
+            user_ws_tx.send(msg).await.map_err(|e| {
+                eprintln!("Error sending message to browser: {}", e);
+            })?;
+
+            Ok(())
+        }
+        .await;
+
+        if let Err(_) = res {
+            eprintln!("Error processing message");
+        }
     }
-    // });
-
-    // workspaces
-    //     .browser_connected(&browser, &mut from_browser_rx)
-    //     .await;
-
-    // user_ws_rx stream will keep processing as long as the user stays
-    // connected. Once they disconnect, then...
-    user_disconnected(my_id, &workspaces).await;
-}
-async fn user_disconnected(my_id: usize, _workspaces: &WorkspaceManager) {
-    eprintln!("good bye user: {}", my_id);
 }

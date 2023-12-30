@@ -2,9 +2,10 @@ use clap::{Parser, Subcommand};
 
 use crate::app::start_app;
 pub mod app;
+pub mod browser;
 pub mod json_storage;
-pub mod model2;
-pub mod web_server_2;
+pub mod model;
+pub mod web_server;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
