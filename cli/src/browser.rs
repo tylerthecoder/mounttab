@@ -18,9 +18,22 @@ impl Workspace {
     }
 }
 
-pub async fn start_browser(workman: &WorkspaceManger) -> Result<(), Box<dyn std::error::Error>> {
+pub fn start_browser(workman: &WorkspaceManger) {
     println!("Starting browser");
+    let workman = workman.clone();
+    tokio::spawn(async move {
+        match start_browser_inner(&workman).await {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("Error starting browser: {}", err);
+            }
+        }
+    });
+}
 
+pub async fn start_browser_inner(
+    workman: &WorkspaceManger,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut chrome_command = Command::new("chromium")
         .arg("--profile-directory='Profile 1'")
         .arg("--remote-debugging-port=9222")
@@ -51,7 +64,6 @@ pub async fn start_browser(workman: &WorkspaceManger) -> Result<(), Box<dyn std:
         }
     });
 
-    // get all tabs and open them
     let tabs = workman.workspace.read().await.tabs.clone();
 
     for tab in tabs {
@@ -59,24 +71,18 @@ pub async fn start_browser(workman: &WorkspaceManger) -> Result<(), Box<dyn std:
         browser.new_page(&tab).await?;
     }
 
-    println!("Tabs opeened");
-
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         let current_workspace = Workspace::from_browser(&browser).await?;
-
-        println!("\n Browser workspace: {:?}", current_workspace);
-
         let mut workspace = workman.workspace.write().await;
-
-        println!("Current workspace: {:?}", workspace);
 
         let actions = workspace.actions_from_diff(current_workspace);
 
         for action in actions {
             println!("Applying action {:?}", action);
-            workspace.apply_action(action);
+            workspace.apply_action(action.clone());
+            workman.tx.send(("browser", action))?;
         }
     }
 

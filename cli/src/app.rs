@@ -11,12 +11,7 @@ pub async fn start_app(path: PathBuf) -> Result<(), std::io::Error> {
 
     let workman = WorkspaceManger::new(workspace);
 
-    match start_browser(&workman).await {
-        Ok(_) => {}
-        Err(err) => {
-            eprintln!("Error starting browser: {}", err);
-        }
-    }
+    start_browser(&workman);
 
     start_file_watcher(&workman, path);
 

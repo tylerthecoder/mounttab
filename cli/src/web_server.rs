@@ -1,9 +1,10 @@
-use crate::{app::WorkspaceManger, model::WorkspaceAction};
 use futures_util::{SinkExt, StreamExt};
 use warp::{
     filters::ws::{Message, WebSocket},
     Filter,
 };
+
+use crate::model::{WorkspaceAction, WorkspaceManger};
 
 pub async fn start_web_server(workman: WorkspaceManger) {
     let workspace_middleware = warp::any().map(move || workman.clone());
