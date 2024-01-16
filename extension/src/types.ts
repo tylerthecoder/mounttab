@@ -1,4 +1,0 @@
-type Message = {
-    AllWorkspaces: string[];
-}
-

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 
@@ -27,30 +28,42 @@ impl Workspace {
                 self.tabs.push(url);
             }
             WorkspaceAction::CloseTab(url) => {
-                self.tabs.retain(|tab| *tab != url);
+                if let Some(index) = self.tabs.iter().position(|x| *x == url) {
+                    self.tabs.remove(index);
+                }
             }
         }
     }
 
     pub fn actions_from_diff(&self, workspace: Workspace) -> Vec<WorkspaceAction> {
         let mut actions = Vec::new();
+        let mut self_tab_count = HashMap::new();
+        let mut workspace_tab_count = HashMap::new();
 
-        let they_have_i_missing = workspace.tabs.iter().filter(|tab| {
-            let tab_exists = self.find_tab(tab).is_some();
-            !tab_exists
-        });
-
-        let i_have_they_missing = self.tabs.iter().filter(|tab| {
-            let tab_exists = workspace.find_tab(tab).is_some();
-            !tab_exists
-        });
-
-        for tab in they_have_i_missing {
-            actions.push(WorkspaceAction::OpenTab(tab.clone()));
+        // Count occurrences of each URL in the current workspace.
+        for tab in &self.tabs {
+            *self_tab_count.entry(tab.clone()).or_insert(0) += 1;
         }
 
-        for tab in i_have_they_missing {
-            actions.push(WorkspaceAction::CloseTab(tab.clone()));
+        // Count occurrences of each URL in the provided workspace.
+        for tab in &workspace.tabs {
+            *workspace_tab_count.entry(tab.clone()).or_insert(0) += 1;
+        }
+
+        // Generate OpenTab actions for additional occurrences in the provided workspace.
+        for (tab, count) in workspace_tab_count.iter() {
+            let self_count = self_tab_count.get(tab).copied().unwrap_or(0);
+            for _ in 0..(count - self_count) {
+                actions.push(WorkspaceAction::OpenTab(tab.clone()));
+            }
+        }
+
+        // Generate CloseTab actions for extra occurrences in the current workspace.
+        for (tab, count) in self_tab_count.iter() {
+            let workspace_count = workspace_tab_count.get(tab).copied().unwrap_or(0);
+            for _ in 0..(count - workspace_count) {
+                actions.push(WorkspaceAction::CloseTab(tab.clone()));
+            }
         }
 
         actions

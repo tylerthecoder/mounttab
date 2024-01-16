@@ -34,7 +34,7 @@ pub fn start_browser(workman: &WorkspaceManger) {
 pub async fn start_browser_inner(
     workman: &WorkspaceManger,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut chrome_command = Command::new("chromium")
+    Command::new("chromium")
         .arg("--profile-directory='Profile 1'")
         .arg("--remote-debugging-port=9222")
         .spawn()?;
@@ -56,9 +56,26 @@ pub async fn start_browser_inner(
     //     }
     // }
 
-    let (browser, mut handler) = chromiumoxide::Browser::connect("http://127.0.0.1:9222").await?;
+    // keep trying to connect until we are successful
 
-    let handle = tokio::task::spawn(async move {
+    let browser;
+    let mut handler;
+
+    loop {
+        let res = chromiumoxide::Browser::connect("http://127.0.0.1:9222").await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        match res {
+            Ok(b) => {
+                (browser, handler) = b;
+                break;
+            }
+            Err(err) => {
+                println!("Error connecting to browser: {}", err);
+            }
+        }
+    }
+
+    tokio::task::spawn(async move {
         loop {
             let _ = handler.next().await.unwrap();
         }
@@ -80,7 +97,6 @@ pub async fn start_browser_inner(
         let actions = workspace.actions_from_diff(current_workspace);
 
         for action in actions {
-            println!("Applying action {:?}", action);
             workspace.apply_action(action.clone());
             workman.tx.send(("browser", action))?;
         }

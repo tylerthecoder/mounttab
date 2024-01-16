@@ -55,9 +55,11 @@ async fn listen_for_actions(workman: &WorkspaceManger, path: PathBuf) {
             continue;
         }
 
-        let mut workspace = workman.workspace.write().await;
+        let workspace = workman.workspace.write().await;
 
-        workspace.apply_action(action);
+        // You don't need to apply the action because someone else already is.
+        // But what if they don't apply the action...?
+        // workspace.apply_action(action);
 
         workspace.save_to_path(&path).unwrap_or_else(|_| {
             eprintln!("Error saving workspace to file");

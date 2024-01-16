@@ -1,6 +1,5 @@
-use clap::{Parser, Subcommand};
-
 use crate::app::start_app;
+use clap::{Parser, Subcommand};
 pub mod app;
 pub mod browser;
 pub mod json_storage;
@@ -36,7 +35,7 @@ async fn main() {
             };
 
             match start_app(path).await {
-                Ok(d) => {
+                Ok(_) => {
                     println!("Program ended");
                 }
                 Err(err) => {
