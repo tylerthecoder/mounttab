@@ -1,3 +1,4 @@
+extern crate ctrlc;
 use chromiumoxide::browser::Browser;
 use std::{io::Read, process::Command};
 use tokio_stream::StreamExt;
@@ -34,10 +35,16 @@ pub fn start_browser(workman: &WorkspaceManger) {
 pub async fn start_browser_inner(
     workman: &WorkspaceManger,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    Command::new("chromium")
+    let mut chrome_ps = Command::new("chromium")
         .arg("--profile-directory='Profile 1'")
         .arg("--remote-debugging-port=9222")
         .spawn()?;
+
+    println!("Browser started");
+    let _ = ctrlc::set_handler(move || {
+        println!("ctrlc handler");
+        chrome_ps.kill().unwrap();
+    });
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -101,6 +108,10 @@ pub async fn start_browser_inner(
             workman.tx.send(("browser", action))?;
         }
     }
+
+    println!("Closing browser");
+
+    chrome_ps.kill()?;
 
     // let _ = handle.await;
 
