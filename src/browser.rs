@@ -1,6 +1,9 @@
 extern crate ctrlc;
-use chromiumoxide::browser::Browser;
-use std::{io::Read, process::Command};
+use chromiumoxide::{browser::Browser, cdp::browser_protocol::target::CreateTargetParams};
+use std::{
+    io::Read,
+    process::{self, Command},
+};
 use tokio_stream::StreamExt;
 
 use crate::model::{Workspace, WorkspaceManger};
@@ -35,35 +38,79 @@ pub fn start_browser(workman: &WorkspaceManger) {
 pub async fn start_browser_inner(
     workman: &WorkspaceManger,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut chrome_ps = Command::new("chromium")
-        .arg("--profile-directory='Profile 1'")
+    // Step 1, try to commect to the current browser
+
+    let res = chromiumoxide::Browser::connect("http://127.0.0.1:9222").await;
+
+    match res {
+        Ok((browser, mut handler)) => {
+            println!("Connecting to existing browser and opening new tab");
+            // Open a new tab in a new window
+
+            tokio::task::spawn(async move {
+                loop {
+                    let _ = handler.next().await.unwrap();
+                }
+            });
+
+            let new_page_params = CreateTargetParams::builder()
+                .url("http://localhost:9222")
+                .new_window(true)
+                .build();
+
+            match new_page_params {
+                Ok(params) => {
+                    println!("new_page_params: {:?}", params);
+                    match browser.new_page(params).await {
+                        Ok(_) => {
+                            println!("New tab opened");
+                        }
+                        Err(err) => {
+                            println!("Error opening new tab: {}", err);
+                        }
+                    }
+                }
+                Err(err) => {
+                    println!("Error creating new_page_params: {}", err);
+                }
+            }
+        }
+        Err(_) => {
+            println!("No browser found, starting new browser")
+        }
+    }
+
+    println!("Starting new browser");
+
+    // Trying to connect to a browser
+
+    // If no browser is open, then
+
+    let tabs = workman.workspace.read().await.tabs.clone();
+
+    let mut chrome_command = Command::new("chromium");
+
+    chrome_command
         .arg("--remote-debugging-port=9222")
-        .spawn()?;
+        .arg("--new-window");
+
+    for tab in tabs {
+        chrome_command.arg(tab);
+    }
+
+    // Print the command
+    println!("{:?}", chrome_command);
+
+    let mut chrome_ps = chrome_command.spawn()?;
 
     println!("Browser started");
     let _ = ctrlc::set_handler(move || {
         println!("ctrlc handler");
         chrome_ps.kill().unwrap();
+        process::exit(0);
     });
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-
-    // Read the chrome command's stdout every 100 ms
-    // wait for the chrome command to output the word "DevTools"
-    // loop {
-    // tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    //
-    //     let mut output_str = String::new();
-    //     if let Some(mut output) = chrome_command.stdout.take() {
-    //         let _ = output.read_to_string(&mut output_str);
-    //     }
-    //     println!("Waiting for chrome to start: {} |||", output_str);
-    //     if output_str.contains("DevTools") {
-    //         break;
-    //     }
-    // }
-
-    // keep trying to connect until we are successful
 
     let browser;
     let mut handler;
@@ -88,13 +135,6 @@ pub async fn start_browser_inner(
         }
     });
 
-    let tabs = workman.workspace.read().await.tabs.clone();
-
-    for tab in tabs {
-        println!("Opening tab {}", tab);
-        browser.new_page(&tab).await?;
-    }
-
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
@@ -108,12 +148,4 @@ pub async fn start_browser_inner(
             workman.tx.send(("browser", action))?;
         }
     }
-
-    println!("Closing browser");
-
-    chrome_ps.kill()?;
-
-    // let _ = handle.await;
-
-    // Ok(())
 }
