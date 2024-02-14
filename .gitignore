@@ -2,3 +2,7 @@ node_modules
 pkg
 target
 browser-tabs.json
+bun.lockb
+state.json
+
+

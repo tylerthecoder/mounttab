@@ -10,3 +10,18 @@ export type TabUrl = string;
 export type BrowserToScriptMessage = {
     tabs: Record<WindowId, TabUrl[]>
 }
+
+
+export type TabState = {
+    tabs: Record<WindowId, TabUrl[]>
+}
+
+
+
+
+export const CONFIG = {
+    port: 3149,
+    stateFile: "./state.json",
+}
+
+

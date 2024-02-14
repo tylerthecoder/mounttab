@@ -1,7 +1,7 @@
 import type { BrowserToScriptMessage, ScriptToBrowserMessage, TabUrl, WindowId } from "./types";
 
 const CONFIG = {
-    wsURL: "ws://localhost:3149"
+    wsURL: "ws://localhost:3149/ws"
 }
 
 let socket: WebSocket;
