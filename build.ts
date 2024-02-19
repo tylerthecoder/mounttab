@@ -3,7 +3,7 @@ import { watch } from "fs/promises";
 import path from "path"
 import { $ } from "bun"
 
-const watch_flag = false;
+const dev = process.argv.includes("--dev");
 
 const buildExtention = async () => {
     if (!(await fs.exists("./pkg"))) {
@@ -13,7 +13,7 @@ const buildExtention = async () => {
         await fs.mkdir("./pkg");
     }
 
-    await Bun.write("pkg/manifest.json", Bun.file("manifest.json"));
+    await Bun.write("pkg/manifest.json", Bun.file("./src/manifest.json"));
     const buildOutput = await Bun.build({
         outdir: "pkg",
         entrypoints: [
@@ -45,12 +45,14 @@ await buildExtention();
 await buildCli();
 await installCli();
 
-if (watch_flag) {
+if (dev) {
     const src_dir = path.join(import.meta.dir, "src");
     console.log("Watching for changes \n", src_dir, "\n")
     const watcher = watch(src_dir, { recursive: true })
     for await (const event of watcher) {
         console.log("File changed, rebuilding...");
         await buildExtention();
+        await buildCli();
+        await installCli();
     }
 }

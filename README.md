@@ -1,24 +1,43 @@
 # Mount Tab
 
-Mount Tab syncs your open browser tabs to a file system.
-
-Now you can store and launch sessions to certain file systems. 
+MountTab is a system that stores your open browser sessions as a file on your computer. This allows a user to group tabs by sessions and close the window and reopen it. 
 
 Inspired by https://omar.website/tabfs/
 
+## Install
+
+Install (bun)[https://bun.sh/]
+
+```
+bun run build
+```
+
+Will install to ~/.local/bin
+
+Load the `./pkg` dir as a chrome extension. Start the chrome extension in an existing browser session
+
 ## Usage
 
-`cargo build --release`
+```
+mt serve
+```
 
-`cargo install --path .`
+Starts a web server that listens to the chrome extension
 
-`mounttab start`
 
-Opens a new browser session. Reads the contents of `mount-tab.json`. As new tabs are made, the file is updated.
+```
+mt start <workspace>
+```
+
+Starts a new browser session with the tabs in the workspace. Create a new session if none exist.
+
+```
+mt list-workspaces
+```
+Lists all workspaces in the state file. 
+
 
 ## Philosophy
 
-I find myself having tabs open for a project and switching projects a lot. Starting on an old project is harder when it takes longer to get back into it. I normally work in a directory and would like to keep all state about that project in that directory. 
-
-Eventually, I want every program I have open for a task to have a serialized state, so I can jump back into them quickly
+I believe that your entire session state should be saved to disk in an easy to read format. I find myself having tabs open for a project and switching projects a lot. Starting on an old project is hard when I have to start from scratch and open up all the tabs I car about.
 

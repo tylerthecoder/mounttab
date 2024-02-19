@@ -1,6 +1,10 @@
 import { spawnSync } from "bun";
-import { CONFIG, type BrowserToScriptMessage, type TabState } from "./types";
+import { type BrowserToScriptMessage, type TabState } from "./types";
 import { $ } from "bun";
+
+export const CONFIG = {
+    port: 3149,
+}
 
 const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
 await $`mkdir -p ${process.env.HOME}/.config/mt`;
