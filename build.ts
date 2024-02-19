@@ -1,8 +1,9 @@
 import fs from "node:fs/promises"
 import { watch } from "fs/promises";
 import path from "path"
+import { $ } from "bun"
 
-const watch_flag = true;
+const watch_flag = false;
 
 const buildExtention = async () => {
     if (!(await fs.exists("./pkg"))) {
@@ -22,7 +23,27 @@ const buildExtention = async () => {
     console.log("Extension built", buildOutput);
 }
 
+const buildCli = async () => {
+    if (!(await fs.exists("./bin"))) {
+        await fs.mkdir("./bin");
+    } else {
+        await fs.rm("./bin", { recursive: true });
+        await fs.mkdir("./bin");
+    }
+
+    await $`bun build ./src/cli.ts --compile --outfile ./bin/mt`
+}
+
+const installCli = async () => {
+    const bin_dir = `${process.env.HOME}/.local/bin`;
+    await $`chmod +x ./bin/mt`
+    await $`rm -f ${bin_dir}/mt`
+    await $`cp ./bin/mt ${bin_dir}/mt`
+}
+
 await buildExtention();
+await buildCli();
+await installCli();
 
 if (watch_flag) {
     const src_dir = path.join(import.meta.dir, "src");

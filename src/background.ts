@@ -6,39 +6,37 @@ const CONFIG = {
 
 let socket: WebSocket;
 
-const connectToSocket = (): Promise<boolean> => {
+const connectToSocket = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-        console.log("Connecting to socket");
+        console.log("Connecting to socket",);
         socket = new WebSocket(CONFIG.wsURL);
         socket.onopen = () => {
             console.log("Connected to socket");
-            resolve(true);
         }
-        socket.onclose = async () => {
-            console.log("Disconnected from socket");
-            await wait(1000);
-        }
-        socket.onerror = (event) => {
-            console.error("Error in socket", event);
-            resolve(false);
-        }
-
         socket.onmessage = (event) => {
             console.log("Got message", event.data);
             const message = JSON.parse(event.data) as ScriptToBrowserMessage;
             handleSocketMessage(message);
         }
+
+        socket.onclose = async () => {
+            console.log("Disconnected from socket");
+            resolve();
+        }
+        socket.onerror = (event) => {
+            console.error("Error in socket", event);
+            resolve();
+        }
     });
 }
 
 const connectOnLoop = async () => {
-    // keep trying to connect to the socket
-    let connected = false;
-    do {
-        connected = await connectToSocket();
+    while (true) {
+        console.log("Connecting to socket");
+        await connectToSocket();
+        console.log("Socket disconnected, reconnecting in 1 second...")
         await wait(1000);
-
-    } while (!connected);
+    }
 }
 
 
@@ -67,6 +65,5 @@ const handleSocketMessage = async (message: ScriptToBrowserMessage) => {
 }
 
 connectOnLoop();
-
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

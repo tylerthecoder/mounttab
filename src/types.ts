@@ -21,7 +21,6 @@ export type TabState = {
 
 export const CONFIG = {
     port: 3149,
-    stateFile: "./state.json",
 }
 
 
