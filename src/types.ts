@@ -14,8 +14,4 @@ export type TabState = {
     tabs: Record<WindowId, TabUrl[]>
 }
 
-export const CONFIG = {
-    port: 3149,
-}
-
 

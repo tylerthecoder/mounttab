@@ -18,7 +18,6 @@ const connectToSocket = (): Promise<void> => {
             const message = JSON.parse(event.data) as ScriptToBrowserMessage;
             handleSocketMessage(message);
         }
-
         socket.onclose = async () => {
             console.log("Disconnected from socket");
             resolve();

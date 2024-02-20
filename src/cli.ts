@@ -1,10 +1,7 @@
 import { spawnSync } from "bun";
 import { type BrowserToScriptMessage, type TabState } from "./types";
 import { $ } from "bun";
-
-export const CONFIG = {
-    port: 3149,
-}
+import { Config } from "./config";
 
 const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
 await $`mkdir -p ${process.env.HOME}/.config/mt`;
@@ -26,10 +23,13 @@ const notConnectedWindowIds = new Set<string>();
 
 const startServer = () => {
     Bun.serve({
-        port: CONFIG.port,
+        port: Config.serverPort,
         async fetch(req, server) {
             console.log(req);
             const url = new URL(req.url);
+
+
+
 
             if (url.pathname === "/ws") {
                 if (server.upgrade(req)) {
@@ -40,7 +40,6 @@ const startServer = () => {
 
             if (url.pathname === "/start") {
                 const workspace = url.searchParams.get("workspace");
-
                 if (!workspace) {
                     return new Response("No workspace specified", { status: 400 });
                 }
@@ -58,8 +57,44 @@ const startServer = () => {
                 const command = ["chromium", "--new-window", ...tabs];
 
                 spawnSync(command);
-
             }
+
+            if (url.pathname === "/assign-window-to-workspace") {
+                const workspace = url.searchParams.get("workspace");
+                const windowId = url.searchParams.get("windowId");
+
+                if (!workspace) {
+                    return new Response("No workspace specified", { status: 400 });
+                }
+                if (!windowId) {
+                    return new Response("No windowId specified", { status: 400 });
+                }
+
+                notConnectedWindowIds.delete(windowId);
+                chromeWindowIdToWorkspace[windowId] = workspace;
+
+                const res = new Response("Ok", { status: 200 });
+                res.headers.set('Access-Control-Allow-Origin', '*');
+                res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                return res
+            }
+
+            if (url.pathname === "/get-workspaces") {
+                const inactive = url.searchParams.get("inactive") === "true";
+
+                let workspaces = Object.keys(currentTabState.tabs);
+
+                if (inactive) {
+                    const activeWindows = new Set(Object.values(chromeWindowIdToWorkspace));
+                    workspaces = workspaces.filter(workspace => !activeWindows.has(workspace));
+                }
+
+                const res = new Response(JSON.stringify(workspaces), { status: 200 });
+                res.headers.set('Access-Control-Allow-Origin', '*');
+                res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                return res
+            }
+
         },
         websocket: {
             async message(ws, message) {
@@ -110,7 +145,7 @@ const startServer = () => {
 const command = process.argv[2];
 if (command === "start") {
     const workspace = process.argv[3];
-    await fetch(`http://localhost:${CONFIG.port}/start?workspace=${workspace}`)
+    await fetch(`http://localhost:${Config.serverPort}/start?workspace=${workspace}`)
 } else if (command == "serve") {
     startServer();
 } else if (command == "list-workspaces") {

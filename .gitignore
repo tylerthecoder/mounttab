@@ -1,9 +1,6 @@
 node_modules
-pkg
-bin
-target
+out
 browser-tabs.json
 bun.lockb
 state.json
-
 

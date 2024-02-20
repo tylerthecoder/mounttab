@@ -5,33 +5,48 @@ import { $ } from "bun"
 
 const dev = process.argv.includes("--dev");
 
-const buildExtention = async () => {
-    if (!(await fs.exists("./pkg"))) {
-        await fs.mkdir("./pkg");
-    } else {
-        await fs.rm("./pkg", { recursive: true });
-        await fs.mkdir("./pkg");
-    }
+const outDir = "./out"
+const extensionDir = `${outDir}/pkg`
 
-    await Bun.write("pkg/manifest.json", Bun.file("./src/manifest.json"));
+
+console.log("Options", { dev, outDir, extensionDir })
+
+const assertDir = async (dir: string) => {
+    const dirExists = await fs.exists(dir);
+
+    if (!dirExists) {
+        await fs.mkdir(dir, { recursive: true })
+    } else {
+        await fs.rm(dir, { recursive: true });
+        await fs.mkdir(dir);
+    }
+}
+
+const buildExtention = async () => {
+    const extensionSource = "./src/extension"
+
+    await Bun.write(`${extensionDir}/manifest.json`, Bun.file(`${extensionSource}/manifest.json`));
+    await Bun.write(`${extensionDir}/popup.html`, Bun.file(`${extensionSource}/popup.html`));
     const buildOutput = await Bun.build({
-        outdir: "pkg",
+        outdir: extensionDir,
         entrypoints: [
-            "src/background.ts",
+            "src/extension/background.ts",
+            "src/extension/popup.tsx",
         ],
     })
+
     console.log("Extension built", buildOutput);
 }
 
 const buildCli = async () => {
-    if (!(await fs.exists("./bin"))) {
-        await fs.mkdir("./bin");
-    } else {
-        await fs.rm("./bin", { recursive: true });
-        await fs.mkdir("./bin");
-    }
+    await $`bun build ./src/cli.ts --compile --outfile ./${outDir}/mt`
+}
 
-    await $`bun build ./src/cli.ts --compile --outfile ./bin/mt`
+const build = async () => {
+    await assertDir(outDir);
+    await assertDir(extensionDir);
+    await buildExtention();
+    await buildCli();
 }
 
 const installCli = async () => {
@@ -41,9 +56,8 @@ const installCli = async () => {
     await $`cp ./bin/mt ${bin_dir}/mt`
 }
 
-await buildExtention();
-await buildCli();
-await installCli();
+await build();
+// await installCli();
 
 if (dev) {
     const src_dir = path.join(import.meta.dir, "src");
@@ -51,8 +65,7 @@ if (dev) {
     const watcher = watch(src_dir, { recursive: true })
     for await (const event of watcher) {
         console.log("File changed, rebuilding...");
-        await buildExtention();
-        await buildCli();
-        await installCli();
+        await build();
+        // await installCli();
     }
 }

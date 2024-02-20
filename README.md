@@ -41,3 +41,11 @@ Lists all workspaces in the state file.
 
 I believe that your entire session state should be saved to disk in an easy to read format. I find myself having tabs open for a project and switching projects a lot. Starting on an old project is hard when I have to start from scratch and open up all the tabs I car about.
 
+
+## Next Features
+
+- [ ] Add system service file
+- [ ] Add UI to chrome extension to manually assign a window to a workspace. 
+- [ ] Add check for starting workspace that already exists
+
+
