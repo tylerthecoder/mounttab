@@ -28,9 +28,6 @@ const startServer = () => {
             console.log(req);
             const url = new URL(req.url);
 
-
-
-
             if (url.pathname === "/ws") {
                 if (server.upgrade(req)) {
                     return; // do not return a Response
@@ -59,6 +56,22 @@ const startServer = () => {
                 spawnSync(command);
             }
 
+            if (url.pathname === "/get-workspace-for-windowid") {
+                const windowId = url.searchParams.get("windowId");
+
+                if (!windowId) {
+                    return new Response("No windowId specified", { status: 400 });
+                }
+
+                const workspace = chromeWindowIdToWorkspace[windowId];
+
+                const res = new Response(workspace, { status: 200 });
+                res.headers.set('Access-Control-Allow-Origin', '*');
+                res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                return res
+
+            }
+
             if (url.pathname === "/assign-window-to-workspace") {
                 const workspace = url.searchParams.get("workspace");
                 const windowId = url.searchParams.get("windowId");
@@ -69,6 +82,8 @@ const startServer = () => {
                 if (!windowId) {
                     return new Response("No windowId specified", { status: 400 });
                 }
+
+                console.log("Assigning window to workspace", windowId, workspace);
 
                 notConnectedWindowIds.delete(windowId);
                 chromeWindowIdToWorkspace[windowId] = workspace;
