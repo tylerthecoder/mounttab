@@ -45,7 +45,7 @@ I believe that your entire session state should be saved to disk in an easy to r
 ## Next Features
 
 - [ ] Add system service file
-- [ ] Add UI to chrome extension to manually assign a window to a workspace. 
 - [ ] Add check for starting workspace that already exists
-
+- [ ] Store the window id to workspace map in memory so the server can recover it
+- [ ] Add simple tests
 

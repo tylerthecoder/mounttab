@@ -51,13 +51,13 @@ const build = async () => {
 
 const installCli = async () => {
     const bin_dir = `${process.env.HOME}/.local/bin`;
-    await $`chmod +x ./bin/mt`
+    await $`chmod +x ./${outDir}/mt`
     await $`rm -f ${bin_dir}/mt`
-    await $`cp ./bin/mt ${bin_dir}/mt`
+    await $`cp ./${outDir}/mt ${bin_dir}/mt`
 }
 
 await build();
-// await installCli();
+await installCli();
 
 if (dev) {
     const src_dir = path.join(import.meta.dir, "src");
@@ -69,3 +69,6 @@ if (dev) {
         // await installCli();
     }
 }
+
+
+
