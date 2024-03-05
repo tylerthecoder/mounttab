@@ -1,30 +1,118 @@
-import type { TabUrl, WindowId } from "./types"
 import { $ } from "bun";
 
+export type WindowId = string;
+export type WorkspaceName = string;
+export type TabUrl = string;
+
 export type TabState = {
-    tabs: Record<WindowId, TabUrl[]>
+    workspaces: Record<WorkspaceName, TabUrl[]>;
+    openWindows: Record<WindowId, WorkspaceName>;
 }
 
-export const getTabStateFromFs = async (): Promise<TabState> => {
-    const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
-    await $`mkdir -p ${process.env.HOME}/.config/mt`;
+const isTabState = (x: any): x is TabState => {
+    if (typeof x !== "object") {
+        return false;
+    }
+    if (typeof x.workspaces !== "object") {
+        return false;
+    }
+    if (typeof x.openWindows !== "object") {
+        return false;
+    }
+    if (Object.keys(x.openWindows).some(key => typeof key !== "string")) {
+        return false;
+    }
+    return true;
+}
 
-    let currentTabState = await (async () => {
-        const file = Bun.file(STATE_FILE)
-        if (!(await file.exists())) {
-            return {
-                tabs: {}
-            } as TabState;
+export const TabService = {
+    empty: (): TabState => {
+        return {
+            workspaces: {},
+            openWindows: {}
+        }
+    },
+
+    getFromFs: async (): Promise<TabState> => {
+        if (process.env.MT_STATE_FILE) {
+            const file = Bun.file(process.env.MT_STATE_FILE);
+            if (!(await file.exists())) {
+                return TabService.empty();
+            }
+            return await file.json();
         }
 
-        return await file.json() as TabState;
-    })();
+        const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
+        await $`mkdir -p ${process.env.HOME}/.config/mt`;
 
-    return currentTabState;
-}
+        const currentTabState = await (async () => {
+            const file = Bun.file(STATE_FILE)
+            if (!(await file.exists())) {
+                return TabService.empty();
+            }
+            return await file.json();
+        })();
 
-export const saveTabStateToFs = async (state: TabState) => {
-    const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
-    await $`mkdir -p ${process.env.HOME}/.config/mt`;
-    await Bun.write(STATE_FILE, JSON.stringify(state, null, 2));
+        if (!isTabState(currentTabState)) {
+            console.log("Invalid state file");
+            return TabService.empty();
+        }
+
+        return currentTabState;
+    },
+
+    saveToFs: async (state: TabState) => {
+        const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
+        await $`mkdir -p ${process.env.HOME}/.config/mt`;
+        await Bun.write(STATE_FILE, JSON.stringify(state, null, 2));
+    },
+
+    getTabsForWorkspace: async (session: string) => {
+        const state = await TabService.getFromFs();
+        return state.workspaces[session] ?? [];
+    },
+
+    getWorkspaceForWindow: async (windowId: WindowId): Promise<string | null> => {
+        const state = await TabService.getFromFs();
+        return state.openWindows[windowId] ?? null;
+    },
+
+    getTabsForWindow: async (windowId: WindowId) => {
+        const state = await TabService.getFromFs();
+        const workspace = state.openWindows[windowId];
+        if (!workspace) {
+            return null;
+        }
+        return state.workspaces[workspace] ?? [];
+    },
+
+    setTabs: async (workspace: WorkspaceName, tabs: TabUrl[]) => {
+        const state = await TabService.getFromFs();
+        state.workspaces[workspace] = tabs;
+        await TabService.saveToFs(state);
+    },
+
+    openWorkspaceInWindow: async (workspace: WorkspaceName, windowId: WindowId) => {
+        const state = await TabService.getFromFs();
+        state.openWindows[windowId] = workspace;
+        await TabService.saveToFs(state);
+    },
+
+    getAllWorkspaces: async () => {
+        const state = await TabService.getFromFs();
+        return Object.keys(state.workspaces);
+    },
+
+    getActiveWorkspace: async () => {
+        const state = await TabService.getFromFs();
+        return Object.values(state.openWindows)
+    },
+
+    getInactiveWorkspaces: async () => {
+        const state = await TabService.getFromFs();
+        const activeWindows = new Set(Object.values(state.openWindows));
+        return Object.keys(state.workspaces).filter(workspace => !activeWindows.has(workspace));
+    }
+
+
 }

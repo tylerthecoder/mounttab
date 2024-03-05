@@ -1,15 +1,14 @@
 import { spawnSync } from "bun";
 import { type BrowserToScriptMessage } from "./types";
-import { getTabStateFromFs, saveTabStateToFs } from "./state";
 import { Config } from "./config";
-
-const currentState = await getTabStateFromFs();
+import { TabService } from "./state";
 
 let currentlyStartingWorkspace: string | null = null;
-let chromeWindowIdToWorkspace: Record<string, string> = {};
 const notConnectedWindowIds = new Set<string>();
 
 export const startServer = () => {
+    console.log("Starting server on port", Config.serverPort);
+
     Bun.serve({
         port: Config.serverPort,
         async fetch(req, server) {
@@ -31,13 +30,9 @@ export const startServer = () => {
 
                 console.log("Starting workspace", workspace);
 
-                if (!currentState.tabs[workspace]) {
-                    console.log("No tabs for workspace", workspace);
-                }
-
-                const tabs = currentState.tabs[workspace] ?? [];
-
                 currentlyStartingWorkspace = workspace;
+
+                const tabs = await TabService.getTabsForWorkspace(workspace);
 
                 const command = ["chromium", "--new-window", ...tabs];
 
@@ -51,9 +46,9 @@ export const startServer = () => {
                     return new Response("No windowId specified", { status: 400 });
                 }
 
-                const workspace = chromeWindowIdToWorkspace[windowId];
+                const workspace = await TabService.getWorkspaceForWindow(windowId);
 
-                const res = new Response("Ok", { status: 200 });
+                const res = new Response(workspace, { status: 200 });
                 res.headers.set('Access-Control-Allow-Origin', '*');
                 res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
                 return res
@@ -73,8 +68,9 @@ export const startServer = () => {
 
                 console.log("Assigning window to workspace", windowId, workspace);
 
+                await TabService.openWorkspaceInWindow(workspace, windowId);
+
                 notConnectedWindowIds.delete(windowId);
-                chromeWindowIdToWorkspace[windowId] = workspace;
 
                 const res = new Response("Ok", { status: 200 });
                 res.headers.set('Access-Control-Allow-Origin', '*');
@@ -85,12 +81,7 @@ export const startServer = () => {
             if (url.pathname === "/get-workspaces") {
                 const inactive = url.searchParams.get("inactive") === "true";
 
-                let workspaces = Object.keys(currentState.tabs);
-
-                if (inactive) {
-                    const activeWindows = new Set(Object.values(chromeWindowIdToWorkspace));
-                    workspaces = workspaces.filter(workspace => !activeWindows.has(workspace));
-                }
+                const workspaces = inactive ? await TabService.getInactiveWorkspaces() : TabService.getAllWorkspaces();
 
                 const res = new Response(JSON.stringify(workspaces), { status: 200 });
                 res.headers.set('Access-Control-Allow-Origin', '*');
@@ -105,12 +96,12 @@ export const startServer = () => {
 
                 if (parsed.tabs) {
                     for (const windowId in parsed.tabs) {
-                        const workspace = chromeWindowIdToWorkspace[windowId];
+                        const workspace = await TabService.getWorkspaceForWindow(windowId);
                         if (workspace) {
-                            currentState.tabs[workspace] = parsed.tabs[windowId];
+                            await TabService.setTabs(workspace, parsed.tabs[windowId]);
                         } else if (currentlyStartingWorkspace && !notConnectedWindowIds.has(windowId)) {
                             console.log("Setting workspace", windowId, currentlyStartingWorkspace);
-                            chromeWindowIdToWorkspace[windowId] = currentlyStartingWorkspace;
+                            await TabService.openWorkspaceInWindow(currentlyStartingWorkspace, windowId);
                             currentlyStartingWorkspace = null;
                         } else {
                             if (!notConnectedWindowIds.has(windowId)) {
@@ -119,8 +110,6 @@ export const startServer = () => {
                             notConnectedWindowIds.add(windowId);
                         }
                     }
-
-                    await saveTabStateToFs(currentState);
                 }
 
                 setTimeout(() => {
