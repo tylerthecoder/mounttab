@@ -16,4 +16,3 @@ if (command === "start") {
     console.log("Command not valid");
 }
 
-

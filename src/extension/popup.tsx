@@ -1,17 +1,16 @@
 import { createRoot } from "react-dom/client";
 import { Config } from "../config";
+import type { TabState } from "../state";
 
 const currentWindow = await chrome.windows.getCurrent();
 console.log(currentWindow);
 
-const myWorkspaceRes = await fetch(`http://localhost:${Config.serverPort}/get-workspace-for-windowid?windowId=${currentWindow.id}`);
-const myWorkspace = await myWorkspaceRes.text();
-console.log(myWorkspace);
+const stateRes = await fetch(`http://localhost:${Config.serverPort}/state`);
+const state = await stateRes.json() as TabState;
+const workspaces = Object.keys(state.workspaces);
+const openWindows = state.openWindows;
 
-const workspaceRes = await fetch(`http://localhost:${Config.serverPort}/get-workspaces?inactive=true`)
-const workspaces = await workspaceRes.json() as string[];
-console.log(workspaces)
-
+const myWorkspace = currentWindow.id ? openWindows[currentWindow.id] : undefined;
 
 const assignWindowToWorkspace = async (workspace: string) => {
     if (currentWindow.id === undefined) {
@@ -29,20 +28,44 @@ const assignWindowToWorkspace = async (workspace: string) => {
     location.reload();
 }
 
+const closeWorkspace = async (workspace: string) => {
+    await fetch(`http://localhost:${Config.serverPort}/close-workspace?workspace=${workspace}`);
+    // This is the ideal way to refresh state
+    location.reload();
+}
+
 const Popup = () => {
     return (
         <div className="App" style={{ width: "300px" }}>
             <div>
                 <p> My Workspace: {myWorkspace} </p>
                 <b> Available Workspaces </b>
-                <ul>
-                    {workspaces.map((workspace) => (
-                        <li key={workspace}>
-                            <p> {workspace} </p>
+                <div>
+                    {workspaces.map((workspace) => {
+                        const windowId = Object.keys(openWindows).find(windowId => openWindows[windowId] === workspace);
+
+
+                        return <div key={workspace}>
+                            <p> {workspace}: {windowId && <> Assigned to window: {windowId} </>} </p>
+
                             <button onClick={() => assignWindowToWorkspace(workspace)}> Assign current tabs to workspace </button>
-                        </li>
-                    ))}
-                </ul>
+                            {windowId && <button onClick={() => closeWorkspace(workspace)}> Close workspace </button>}
+                        </div>
+                    })}
+                </div>
+
+                <div>
+                    <b> Make new workspace </b>
+                    <input type="text" id="new-workspace" />
+                    <button onClick={() => {
+                        const workspace = (document.getElementById("new-workspace") as HTMLInputElement).value;
+                        if (workspace) {
+                            assignWindowToWorkspace(workspace);
+                        }
+                    }}> Make new workspace </button>
+                </div>
+
+
             </div>
         </div>
     );

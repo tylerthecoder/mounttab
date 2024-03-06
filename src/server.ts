@@ -39,6 +39,32 @@ export const startServer = () => {
                 spawnSync(command);
             }
 
+            if (url.pathname === "/state") {
+                const state = await TabService.getFromFs();
+
+                const res = new Response(JSON.stringify(state), { status: 200 });
+                res.headers.set('Access-Control-Allow-Origin', '*');
+                res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                return res
+            }
+
+            if (url.pathname === "/close-workspace") {
+                const workspace = url.searchParams.get("workspace");
+
+                console.log("API Closing workspace", workspace);
+
+                if (!workspace) {
+                    return new Response("No workspace specified", { status: 400 });
+                }
+
+                await TabService.closeWorkspace(workspace);
+
+                const res = new Response("Ok", { status: 200 });
+                res.headers.set('Access-Control-Allow-Origin', '*');
+                res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                return res
+            }
+
             if (url.pathname === "/get-workspace-for-windowid") {
                 const windowId = url.searchParams.get("windowId");
 
@@ -95,6 +121,15 @@ export const startServer = () => {
                 const parsed = JSON.parse(typeof message === "string" ? message : message.toString()) as BrowserToScriptMessage;
 
                 if (parsed.tabs) {
+                    const { tabs } = parsed;
+
+                    const newWindows = Object.keys(tabs).filter(windowId => !notConnectedWindowIds.has(windowId));
+                    if (newWindows.length > 1 && currentlyStartingWorkspace) {
+                        console.log("Too many windows to determine which windows assign to ", currentlyStartingWorkspace);
+                        currentlyStartingWorkspace = null;
+                    }
+
+
                     for (const windowId in parsed.tabs) {
                         const workspace = await TabService.getWorkspaceForWindow(windowId);
                         if (workspace) {

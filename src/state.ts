@@ -41,7 +41,6 @@ export const TabService = {
             }
             return await file.json();
         }
-
         const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
         await $`mkdir -p ${process.env.HOME}/.config/mt`;
 
@@ -92,8 +91,21 @@ export const TabService = {
         await TabService.saveToFs(state);
     },
 
-    openWorkspaceInWindow: async (workspace: WorkspaceName, windowId: WindowId) => {
+    closeWorkspace: async (workspace: WorkspaceName) => {
+        console.log("Closing workspace", workspace);
         const state = await TabService.getFromFs();
+        Object.entries(state.openWindows).forEach(([windowId, ws]) => {
+            if (ws === workspace) {
+                delete state.openWindows[windowId];
+            }
+        });
+        await TabService.saveToFs(state);
+    },
+
+    openWorkspaceInWindow: async (workspace: WorkspaceName, windowId: WindowId) => {
+        console.log("Opening workspace in window", workspace, windowId);
+        const state = await TabService.getFromFs();
+        await TabService.closeWorkspace(workspace);
         state.openWindows[windowId] = workspace;
         await TabService.saveToFs(state);
     },
