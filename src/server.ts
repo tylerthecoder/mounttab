@@ -1,16 +1,18 @@
 import { spawnSync } from "bun";
 import { type BrowserToScriptMessage } from "./types";
-import { Config } from "./config";
 import { TabService } from "./state";
+import { getConfig } from "./config";
 
 let currentlyStartingWorkspace: string | null = null;
 const notConnectedWindowIds = new Set<string>();
 
+const config = await getConfig();
+
 export const startServer = () => {
-    console.log("Starting server on port", Config.serverPort);
+    console.log("Starting server on port", config.serverPort);
 
     Bun.serve({
-        port: Config.serverPort,
+        port: config.serverPort,
         async fetch(req, server) {
             console.log("Incoming request", req.url);
             const url = new URL(req.url);

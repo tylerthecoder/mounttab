@@ -1,4 +1,4 @@
-import { Config } from "./config";
+import { getConfig } from "./config";
 import { startServer } from "./server";
 import { TabService } from "./state";
 
@@ -10,11 +10,13 @@ function printHelp() {
     console.log("  serve");
     console.log("  list-workspaces");
     console.log("  read-state");
+    console.log("  read-config");
 }
 
 if (command === "start") {
+    const config = await getConfig();
     const workspace = process.argv[3];
-    await fetch(`http://localhost:${Config.serverPort}/start?workspace=${workspace}`)
+    await fetch(`http://localhost:${config.serverPort}/start?workspace=${workspace}`)
 } else if (command == "serve") {
     startServer();
 } else if (command == "list-workspaces") {
@@ -23,6 +25,9 @@ if (command === "start") {
 } else if (command == "read-state") {
     const state = await TabService.getFromFs();
     console.log(JSON.stringify(state, null, 2));
+} else if (command == "read-config") {
+    const config = await getConfig();
+    console.log(JSON.stringify(config, null, 2));
 } else {
     printHelp();
 }

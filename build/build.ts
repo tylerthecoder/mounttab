@@ -3,6 +3,7 @@ import { watch } from "fs/promises";
 import { $ } from "bun"
 
 const dev = process.argv.includes("--dev");
+const prod = process.argv.includes("--prod");
 
 const outDir = "./out"
 const extensionOutDir = `${outDir}/pkg`
@@ -72,21 +73,29 @@ const updateSystemdService = async () => {
     console.log("Restarted service", restartRes);
 }
 
-await buildCli();
-await buildExtention();
-await installCli();
-await installSystemService();
+const update = async () => {
+    await buildCli();
+    await buildExtention();
+    if (prod) {
+        await installCli();
+        await updateSystemdService();
+    }
+}
+
+
+if (prod) {
+    await installSystemService();
+}
+
+await update();
 
 if (dev) {
     console.log("Watching for changes in ./src")
     const watcher = watch("./src", { recursive: true })
     for await (const _ of watcher) {
         console.log("File changed, rebuilding...");
-        await buildCli();
-        await buildExtention();
-        await updateSystemdService();
+        await update();
     }
 }
-
 
 

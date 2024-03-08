@@ -1,5 +1,4 @@
-import { $ } from "bun";
-import toml from "toml";
+import { getConfig } from "./config";
 
 export type WindowId = string;
 export type WorkspaceName = string;
@@ -26,38 +25,6 @@ const isTabState = (x: any): x is TabState => {
     return true;
 }
 
-
-type Config = {
-    stateFile: string;
-}
-
-const DEFAULT_CONFIG: Config = {
-    stateFile: `${process.env.HOME}/.config/mt/state.json`
-}
-
-const getConfig = async (): Promise<Config> => {
-    const configFilePath = `${process.env.HOME}/.config/mt/mt.toml`;
-    await $`mkdir -p ${process.env.HOME}/.config/mt`;
-
-    const configFile = Bun.file(configFilePath);
-
-    if (!(await configFile.exists())) {
-        return DEFAULT_CONFIG;
-    }
-
-    const config = toml.parse(await configFile.text()) as {};
-
-    if (!config || typeof config !== "object") {
-        console.log("Invalid config file");
-        return DEFAULT_CONFIG;
-    }
-
-    const stateFile = "stateFile" in config && typeof config.stateFile === "string" ? config.stateFile : DEFAULT_CONFIG.stateFile;
-
-    return {
-        stateFile
-    }
-}
 
 export const TabService = {
     empty: (): TabState => {
