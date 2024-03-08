@@ -5,7 +5,8 @@
   "scripts": {
     "build": "bun run build/build.ts",
     "dev": "bun run build/build.ts --dev",
-    "dev:prod": "bun run build/build.ts --dev --prod"
+    "dev:prod": "bun run build/build.ts --dev --prod",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",

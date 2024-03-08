@@ -1,17 +1,16 @@
-import { $ } from "bun";
-import toml from "toml";
 
 type Config = {
     stateFile: string;
-    serverPort: number;
 }
 
 const DEFAULT_CONFIG: Config = {
     stateFile: `${process.env.HOME}/.config/mt/state.json`,
-    serverPort: 3149
 }
 
 export const getConfig = async (): Promise<Config> => {
+    const { $ } = await import("bun");
+    const toml = await import("toml");
+
     const configFilePath = `${process.env.HOME}/.config/mt/mt.toml`;
     await $`mkdir -p ${process.env.HOME}/.config/mt`;
 
@@ -40,18 +39,10 @@ export const getConfig = async (): Promise<Config> => {
         return String(val);
     }
 
-    function getNumberProp(prop: keyof Config): number {
-        const val = getProp(prop);
-        return parseInt(String(val), 10);
-    }
-
-
     const stateFile = getStringProp("stateFile");
-    const serverPort = getNumberProp("serverPort");
 
     return {
         stateFile,
-        serverPort,
     }
 }
 

@@ -1,11 +1,13 @@
 import { createRoot } from "react-dom/client";
-import { Config } from "../config";
 import type { TabState } from "../state";
+import { STATIC_CONFIG } from "../static-config";
+
+const { serverPort } = STATIC_CONFIG;
 
 const currentWindow = await chrome.windows.getCurrent();
 console.log(currentWindow);
 
-const stateRes = await fetch(`http://localhost:${Config.serverPort}/state`);
+const stateRes = await fetch(`http://localhost:${serverPort}/state`);
 const state = await stateRes.json() as TabState;
 const workspaces = Object.keys(state.workspaces);
 const openWindows = state.openWindows;
@@ -22,14 +24,14 @@ const assignWindowToWorkspace = async (workspace: string) => {
     params.append("workspace", workspace);
     params.append("windowId", currentWindow.id.toString());
 
-    await fetch(`http://localhost:${Config.serverPort}/assign-window-to-workspace?${params.toString()}`);
+    await fetch(`http://localhost:${serverPort}/assign-window-to-workspace?${params.toString()}`);
 
     // This is the ideal way to refresh state
     location.reload();
 }
 
 const closeWorkspace = async (workspace: string) => {
-    await fetch(`http://localhost:${Config.serverPort}/close-workspace?workspace=${workspace}`);
+    await fetch(`http://localhost:${serverPort}/close-workspace?workspace=${workspace}`);
     // This is the ideal way to refresh state
     location.reload();
 }

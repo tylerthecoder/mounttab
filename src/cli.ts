@@ -1,8 +1,10 @@
 import { getConfig } from "./config";
 import { startServer } from "./server";
 import { TabService } from "./state";
+import { STATIC_CONFIG } from "./static-config";
 
 const command = process.argv[2];
+
 
 function printHelp() {
     console.log("Commands:");
@@ -14,9 +16,9 @@ function printHelp() {
 }
 
 if (command === "start") {
-    const config = await getConfig();
+    const { serverPort } = STATIC_CONFIG;
     const workspace = process.argv[3];
-    await fetch(`http://localhost:${config.serverPort}/start?workspace=${workspace}`)
+    await fetch(`http://localhost:${serverPort}/start?workspace=${workspace}`)
 } else if (command == "serve") {
     startServer();
 } else if (command == "list-workspaces") {

@@ -1,17 +1,17 @@
-import type { BrowserToScriptMessage, ScriptToBrowserMessage, TabUrl, WindowId } from "./types";
+import type { TabUrl, WindowId } from "../state";
+import { STATIC_CONFIG } from "../static-config";
+import type { BrowserToScriptMessage, ScriptToBrowserMessage } from "../types";
 
-const CONFIG = {
-    wsURL: "ws://localhost:3149/ws"
-}
+const wsURL = `ws://localhost:${STATIC_CONFIG.serverPort}/ws`
 
 let socket: WebSocket;
 
 const connectToSocket = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _) => {
         console.log("Connecting to socket",);
 
         try {
-            socket = new WebSocket(CONFIG.wsURL);
+            socket = new WebSocket(wsURL);
         } catch (e) {
             console.error("Error creating socket", e);
             resolve();

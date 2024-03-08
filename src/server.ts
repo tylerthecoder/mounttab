@@ -1,18 +1,18 @@
 import { spawnSync } from "bun";
 import { type BrowserToScriptMessage } from "./types";
 import { TabService } from "./state";
-import { getConfig } from "./config";
+import { STATIC_CONFIG } from "./static-config";
 
 let currentlyStartingWorkspace: string | null = null;
 const notConnectedWindowIds = new Set<string>();
 
-const config = await getConfig();
+const { serverPort } = STATIC_CONFIG;
 
 export const startServer = () => {
-    console.log("Starting server on port", config.serverPort);
+    console.log("Starting server on port", serverPort);
 
     Bun.serve({
-        port: config.serverPort,
+        port: serverPort,
         async fetch(req, server) {
             console.log("Incoming request", req.url);
             const url = new URL(req.url);
@@ -172,7 +172,7 @@ export const startServer = () => {
                 ws.send(JSON.stringify({ getTabs: true }));
 
             },
-            close(ws) {
+            close(_ws) {
                 console.log("Extension disconnected");
             }
         }

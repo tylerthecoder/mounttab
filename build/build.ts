@@ -27,7 +27,8 @@ const buildExtention = async () => {
 
     await Bun.write(`${extensionOutDir}/manifest.json`, Bun.file(`${extensionSourceDir}/manifest.json`));
     await Bun.write(`${extensionOutDir}/popup.html`, Bun.file(`${extensionSourceDir}/popup.html`));
-    await Bun.build({
+
+    const buildOut = await Bun.build({
         outdir: extensionOutDir,
         entrypoints: [
             "src/extension/background.ts",
@@ -35,7 +36,7 @@ const buildExtention = async () => {
         ],
     })
 
-    console.log("Extension built");
+    console.log("Extension built", buildOut)
 }
 
 const buildCli = async () => {
