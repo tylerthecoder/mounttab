@@ -12,7 +12,7 @@ export const startServer = () => {
     Bun.serve({
         port: Config.serverPort,
         async fetch(req, server) {
-            console.log(req);
+            console.log("Incoming request", req.url);
             const url = new URL(req.url);
 
             if (url.pathname === "/ws") {
@@ -123,14 +123,27 @@ export const startServer = () => {
                 if (parsed.tabs) {
                     const { tabs } = parsed;
 
-                    const newWindows = Object.keys(tabs).filter(windowId => !notConnectedWindowIds.has(windowId));
+                    const state = await TabService.getFromFs();
+                    const stateOpenWindows = Object.keys(state.openWindows);
+
+                    const newWindows = Object.keys(tabs)
+                        .filter(windowId => !notConnectedWindowIds.has(windowId))
+                        .filter(windowId => !state.openWindows[windowId]);
+
                     if (newWindows.length > 1 && currentlyStartingWorkspace) {
-                        console.log("Too many windows to determine which windows assign to ", currentlyStartingWorkspace);
+                        console.log("Too many windows to determine which windows assign to ", currentlyStartingWorkspace, "New windows", newWindows);
+                        console.log("Open windows", Object.keys(state.openWindows));
                         currentlyStartingWorkspace = null;
                     }
 
+                    const closedWindows = stateOpenWindows.filter(windowId => !tabs[windowId]);
+                    for (const windowId of closedWindows) {
+                        console.log("Closing workspace for window", windowId);
+                        await TabService.closeWorkspace(state.openWindows[windowId]);
+                    }
 
-                    for (const windowId in parsed.tabs) {
+
+                    for (const windowId in tabs) {
                         const workspace = await TabService.getWorkspaceForWindow(windowId);
                         if (workspace) {
                             await TabService.setTabs(workspace, parsed.tabs[windowId]);
@@ -140,7 +153,7 @@ export const startServer = () => {
                             currentlyStartingWorkspace = null;
                         } else {
                             if (!notConnectedWindowIds.has(windowId)) {
-                                console.log("Adding Not connected", windowId);
+                                console.log("Adding not connected", windowId);
                             }
                             notConnectedWindowIds.add(windowId);
                         }

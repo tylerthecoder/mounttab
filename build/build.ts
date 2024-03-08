@@ -68,8 +68,8 @@ const updateSystemdService = async () => {
     const res = await Bun.write(`${process.env.HOME}/.config/systemd/user/MountTab.service`, serviceFile);
     console.log("Installed service file", res);
     await $`systemctl --user daemon-reload`
-    await $`systemctl --user restart MountTab`
-    console.log("Restarted service");
+    const restartRes = await $`systemctl --user restart MountTab`
+    console.log("Restarted service", restartRes);
 }
 
 await buildCli();

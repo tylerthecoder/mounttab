@@ -9,7 +9,15 @@ let socket: WebSocket;
 const connectToSocket = (): Promise<void> => {
     return new Promise((resolve, reject) => {
         console.log("Connecting to socket",);
-        socket = new WebSocket(CONFIG.wsURL);
+
+        try {
+            socket = new WebSocket(CONFIG.wsURL);
+        } catch (e) {
+            console.error("Error creating socket", e);
+            resolve();
+            return;
+        }
+
         socket.onopen = () => {
             console.log("Connected to socket");
         }

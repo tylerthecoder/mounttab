@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import toml from "toml";
 
 export type WindowId = string;
 export type WorkspaceName = string;
@@ -25,6 +26,39 @@ const isTabState = (x: any): x is TabState => {
     return true;
 }
 
+
+type Config = {
+    stateFile: string;
+}
+
+const DEFAULT_CONFIG: Config = {
+    stateFile: `${process.env.HOME}/.config/mt/state.json`
+}
+
+const getConfig = async (): Promise<Config> => {
+    const configFilePath = `${process.env.HOME}/.config/mt/mt.toml`;
+    await $`mkdir -p ${process.env.HOME}/.config/mt`;
+
+    const configFile = Bun.file(configFilePath);
+
+    if (!(await configFile.exists())) {
+        return DEFAULT_CONFIG;
+    }
+
+    const config = toml.parse(await configFile.text()) as {};
+
+    if (!config || typeof config !== "object") {
+        console.log("Invalid config file");
+        return DEFAULT_CONFIG;
+    }
+
+    const stateFile = "stateFile" in config && typeof config.stateFile === "string" ? config.stateFile : DEFAULT_CONFIG.stateFile;
+
+    return {
+        stateFile
+    }
+}
+
 export const TabService = {
     empty: (): TabState => {
         return {
@@ -34,18 +68,10 @@ export const TabService = {
     },
 
     getFromFs: async (): Promise<TabState> => {
-        if (process.env.MT_STATE_FILE) {
-            const file = Bun.file(process.env.MT_STATE_FILE);
-            if (!(await file.exists())) {
-                return TabService.empty();
-            }
-            return await file.json();
-        }
-        const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
-        await $`mkdir -p ${process.env.HOME}/.config/mt`;
+        const { stateFile } = await getConfig();
 
         const currentTabState = await (async () => {
-            const file = Bun.file(STATE_FILE)
+            const file = Bun.file(stateFile)
             if (!(await file.exists())) {
                 return TabService.empty();
             }
@@ -61,9 +87,8 @@ export const TabService = {
     },
 
     saveToFs: async (state: TabState) => {
-        const STATE_FILE = `${process.env.HOME}/.config/mt/state.json`;
-        await $`mkdir -p ${process.env.HOME}/.config/mt`;
-        await Bun.write(STATE_FILE, JSON.stringify(state, null, 2));
+        const { stateFile } = await getConfig();
+        await Bun.write(stateFile, JSON.stringify(state, null, 2));
     },
 
     getTabsForWorkspace: async (session: string) => {
