@@ -4,17 +4,16 @@ MountTab is a system that stores your open browser sessions as a file on your co
 
 Inspired by https://omar.website/tabfs/
 
-## Install
+## Setup
 
 Install (bun)[https://bun.sh/]
 
 ```
-bun run build
+bun run install
 ```
+This will install the binary to `~/.local/bin` and setup a systemd service. 
 
-Will install to ~/.local/bin
-
-Load the `./pkg` dir as a chrome extension. Start the chrome extension in an existing browser session
+You also need to load the `./out/pkg` directory as a Chrome extension (here)[chrome://extensions/]
 
 ## Usage
 

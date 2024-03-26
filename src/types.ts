@@ -1,13 +1,9 @@
 import type { TabUrl, WindowId } from "./state";
 
 export type ScriptToBrowserMessage = {
-    getTabs: boolean;
-}
-
+  getTabs: boolean;
+};
 
 export type BrowserToScriptMessage = {
-    tabs: Record<WindowId, TabUrl[]>
-}
-
-
-
+  tabs: Record<WindowId, TabUrl[]>;
+};

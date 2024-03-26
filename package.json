@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "bun run build/build.ts",
+    "install": "bun run build/build.ts --prod",
     "dev": "bun run build/build.ts --dev",
     "dev:prod": "bun run build/build.ts --dev --prod",
     "typecheck": "tsc --noEmit"
