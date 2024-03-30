@@ -79,8 +79,19 @@ export const TabService = {
 
     setTabs: async (workspace: WorkspaceName, tabs: TabUrl[]) => {
         const state = await TabService.getFromFs();
-        state.workspaces[workspace] = tabs;
-        await TabService.saveToFs(state);
+
+        // Calculate the diff
+        const existingTabs = state.workspaces[workspace] ?? [];
+        const newTabs = tabs.filter(tab => !existingTabs.includes(tab));
+        const removedTabs = existingTabs.filter(tab => !tabs.includes(tab));
+        if (newTabs.length > 0 || removedTabs.length > 0) {
+            console.log(`Found diff, setting tabs for workspace: ${workspace}`);
+            console.log("New tabs", newTabs);
+            console.log("Removed tabs", removedTabs);
+            state.workspaces[workspace] = tabs;
+            await TabService.saveToFs(state);
+        }
+
     },
 
     closeWorkspace: async (workspace: WorkspaceName) => {
