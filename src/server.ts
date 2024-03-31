@@ -200,6 +200,8 @@ export const startServer = () => {
             open(ws) {
                 console.log("Extension connected");
 
+                currentlyStartingWorkspace = null;
+
                 if (getTabsTimer) {
                     console.log("Clearing existing timer");
                     clearInterval(getTabsTimer);
