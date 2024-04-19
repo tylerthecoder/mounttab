@@ -107,8 +107,6 @@ export const startServer = () => {
                     return new Response("No windowId specified", { status: 400 });
                 }
 
-                console.log("Assigning window to workspace", windowId, workspace);
-
                 await TabService.openWorkspaceInWindow(workspace, windowId, HOST_NAME);
 
                 notConnectedWindowIds.delete(windowId);
@@ -171,11 +169,9 @@ export const startServer = () => {
                     for (const windowId of closedWindows) {
                         const owner = await TabService.getWindowOwner(windowId);
                         if (owner !== HOST_NAME) {
-                            console.log("Not closing window, not owner", windowId);
                             continue;
                         }
 
-                        console.log("Closing workspace for window", windowId);
                         await TabService.closeWorkspace(state.openWindows[windowId], HOST_NAME);
                     }
 
@@ -187,14 +183,10 @@ export const startServer = () => {
                             currentlyStartingWorkspace &&
                             !notConnectedWindowIds.has(windowId)
                         ) {
-                            console.log(
-                                "Setting workspace",
-                                windowId,
-                                currentlyStartingWorkspace,
-                            );
                             await TabService.openWorkspaceInWindow(
                                 currentlyStartingWorkspace,
                                 windowId,
+                                HOST_NAME
                             );
                             currentlyStartingWorkspace = null;
                         } else {

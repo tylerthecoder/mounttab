@@ -9,7 +9,7 @@ export type TabState = {
     workspaces: Record<WorkspaceName, TabUrl[]>;
     openWindows: Record<WindowId, WorkspaceName>;
     // Stores the name of the computer that has control of this window
-    windowOwners: Record<WindowId, ComputerName>;
+    windowOwners?: Record<WindowId, ComputerName>;
 }
 
 const isTabState = (x: any): x is TabState => {
@@ -83,7 +83,7 @@ export const TabService = {
 
     getWindowOwner: async (windowId: WindowId) => {
         const state = await TabService.getFromFs();
-        return state.windowOwners[windowId] ?? null;
+        return state.windowOwners?.[windowId] ?? null;
     },
 
     setTabs: async (workspace: WorkspaceName, tabs: TabUrl[]) => {
@@ -123,11 +123,14 @@ export const TabService = {
     },
 
     openWorkspaceInWindow: async (workspace: WorkspaceName, windowId: WindowId, computer: ComputerName) => {
-        console.log("Opening workspace in window", workspace, windowId);
+        console.log(`Opening workspace (${workspace}) in window (${windowId}) for computer (${computer})`);
         const state = await TabService.getFromFs();
 
         await TabService.closeWorkspace(workspace, computer)
         state.openWindows[windowId] = workspace;
+        if (!state.windowOwners) {
+            state.windowOwners = {};
+        }
         state.windowOwners[windowId] = computer;
         await TabService.saveToFs(state);
     },
