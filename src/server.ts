@@ -2,6 +2,7 @@ import { spawnSync } from "bun";
 import { type BrowserToScriptMessage } from "./types";
 import { TabService } from "./state";
 import { STATIC_CONFIG } from "./static-config";
+import os from "os";
 
 let currentlyStartingWorkspace: string | null = null;
 const notConnectedWindowIds = new Set<string>();
@@ -9,6 +10,8 @@ const notConnectedWindowIds = new Set<string>();
 let getTabsTimer: Timer | null = null;
 
 const { serverPort } = STATIC_CONFIG;
+
+const HOST_NAME = os.hostname();
 
 export const startServer = () => {
     console.log("Starting server on port", serverPort);
@@ -64,7 +67,7 @@ export const startServer = () => {
                     return new Response("No workspace specified", { status: 400 });
                 }
 
-                await TabService.closeWorkspace(workspace);
+                await TabService.closeWorkspace(workspace, HOST_NAME);
 
                 const res = new Response("Ok", { status: 200 });
                 res.headers.set("Access-Control-Allow-Origin", "*");
@@ -106,7 +109,7 @@ export const startServer = () => {
 
                 console.log("Assigning window to workspace", windowId, workspace);
 
-                await TabService.openWorkspaceInWindow(workspace, windowId);
+                await TabService.openWorkspaceInWindow(workspace, windowId, HOST_NAME);
 
                 notConnectedWindowIds.delete(windowId);
 
@@ -166,8 +169,14 @@ export const startServer = () => {
                         (windowId) => !tabs[windowId],
                     );
                     for (const windowId of closedWindows) {
+                        const owner = await TabService.getWindowOwner(windowId);
+                        if (owner !== HOST_NAME) {
+                            console.log("Not closing window, not owner", windowId);
+                            continue;
+                        }
+
                         console.log("Closing workspace for window", windowId);
-                        await TabService.closeWorkspace(state.openWindows[windowId]);
+                        await TabService.closeWorkspace(state.openWindows[windowId], HOST_NAME);
                     }
 
                     for (const windowId in tabs) {

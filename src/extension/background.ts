@@ -8,7 +8,7 @@ let socket: WebSocket;
 
 const connectToSocket = (): Promise<void> => {
     return new Promise((resolve, _) => {
-        console.log("Connecting to socket",);
+        console.log("Connecting to socket");
 
         try {
             socket = new WebSocket(wsURL);
@@ -74,3 +74,10 @@ const handleSocketMessage = async (message: ScriptToBrowserMessage) => {
 connectOnLoop();
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+
+// Listen for the popup script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log("Got message", message);
+    sendResponse({ message: "Got message" });
+});

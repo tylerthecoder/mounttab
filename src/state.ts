@@ -3,10 +3,13 @@ import { getConfig } from "./config";
 export type WindowId = string;
 export type WorkspaceName = string;
 export type TabUrl = string;
+export type ComputerName = string;
 
 export type TabState = {
     workspaces: Record<WorkspaceName, TabUrl[]>;
     openWindows: Record<WindowId, WorkspaceName>;
+    // Stores the name of the computer that has control of this window
+    windowOwners: Record<WindowId, ComputerName>;
 }
 
 const isTabState = (x: any): x is TabState => {
@@ -30,7 +33,8 @@ export const TabService = {
     empty: (): TabState => {
         return {
             workspaces: {},
-            openWindows: {}
+            openWindows: {},
+            windowOwners: {}
         }
     },
 
@@ -77,6 +81,11 @@ export const TabService = {
         return state.workspaces[workspace] ?? [];
     },
 
+    getWindowOwner: async (windowId: WindowId) => {
+        const state = await TabService.getFromFs();
+        return state.windowOwners[windowId] ?? null;
+    },
+
     setTabs: async (workspace: WorkspaceName, tabs: TabUrl[]) => {
         const state = await TabService.getFromFs();
 
@@ -94,9 +103,17 @@ export const TabService = {
 
     },
 
-    closeWorkspace: async (workspace: WorkspaceName) => {
+    closeWorkspace: async (workspace: WorkspaceName, computer: ComputerName) => {
         console.log("Closing workspace", workspace);
         const state = await TabService.getFromFs();
+
+        const owner = await TabService.getWindowOwner(workspace);
+
+        if (owner !== computer) {
+            console.log("Not closing workspace, not owner");
+            return;
+        }
+
         Object.entries(state.openWindows).forEach(([windowId, ws]) => {
             if (ws === workspace) {
                 delete state.openWindows[windowId];
@@ -105,11 +122,13 @@ export const TabService = {
         await TabService.saveToFs(state);
     },
 
-    openWorkspaceInWindow: async (workspace: WorkspaceName, windowId: WindowId) => {
+    openWorkspaceInWindow: async (workspace: WorkspaceName, windowId: WindowId, computer: ComputerName) => {
         console.log("Opening workspace in window", workspace, windowId);
         const state = await TabService.getFromFs();
-        await TabService.closeWorkspace(workspace);
+
+        await TabService.closeWorkspace(workspace, computer)
         state.openWindows[windowId] = workspace;
+        state.windowOwners[windowId] = computer;
         await TabService.saveToFs(state);
     },
 

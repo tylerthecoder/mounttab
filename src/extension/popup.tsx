@@ -4,6 +4,10 @@ import { STATIC_CONFIG } from "../static-config";
 
 const { serverPort } = STATIC_CONFIG;
 
+chrome.runtime.sendMessage({
+    message: "ping"
+})
+
 const currentWindow = await chrome.windows.getCurrent();
 console.log(currentWindow);
 
