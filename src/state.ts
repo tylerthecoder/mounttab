@@ -86,6 +86,21 @@ export const TabService = {
         return state.windowOwners?.[windowId] ?? null;
     },
 
+    getWorkspaceOwner: async (workspace: WorkspaceName) => {
+        const state = await TabService.getFromFs();
+        const windowIds = Object.entries(state.openWindows).filter(([windowId, ws]) => ws === workspace).map(([windowId, ws]) => windowId);
+        if (windowIds.length === 0) {
+            return null;
+        }
+        if (windowIds.length > 1) {
+            console.error("More than one window for workspace", workspace, windowIds);
+
+            return null;
+        }
+
+        return TabService.getWindowOwner(windowIds[0]);
+    },
+
     setTabs: async (workspace: WorkspaceName, tabs: TabUrl[]) => {
         const state = await TabService.getFromFs();
 
@@ -107,7 +122,7 @@ export const TabService = {
         console.log("Closing workspace", workspace);
         const state = await TabService.getFromFs();
 
-        const owner = await TabService.getWindowOwner(workspace);
+        const owner = await TabService.getWorkspaceOwner(workspace);
 
         if (owner !== computer) {
             console.log("Not closing workspace, not owner");
@@ -127,11 +142,16 @@ export const TabService = {
         const state = await TabService.getFromFs();
 
         await TabService.closeWorkspace(workspace, computer)
+
+        // remove all windows that point to this workspace
+        state.openWindows = Object.fromEntries(Object.entries(state.openWindows).filter(([wid, ws]) => ws !== workspace));
         state.openWindows[windowId] = workspace;
+
         if (!state.windowOwners) {
             state.windowOwners = {};
         }
         state.windowOwners[windowId] = computer;
+
         await TabService.saveToFs(state);
     },
 
